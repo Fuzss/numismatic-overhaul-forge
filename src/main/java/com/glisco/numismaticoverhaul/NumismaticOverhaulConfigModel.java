@@ -1,45 +1,58 @@
 package com.glisco.numismaticoverhaul;
 
-import fuzs.puzzleslib.config.ConfigCore;
-import fuzs.puzzleslib.config.annotation.Config;
+import net.minecraftforge.common.ForgeConfigSpec;
 
-public class NumismaticOverhaulConfigModel implements ConfigCore {
+public class NumismaticOverhaulConfigModel {
+    public static final NumismaticOverhaulConfigModel INSTANCE = new NumismaticOverhaulConfigModel();
+    private final ForgeConfigSpec spec;
 
-    @Config(description = "Whether villagers should use Numismatic currency for trading")
-    public boolean enableVillagerTrading = true;
+    public ForgeConfigSpec.BooleanValue enableVillagerTrading;
 
-    @Config(description = "Whether taxes from Minecraft Comes Alive: Reborn should be delivered as Numismatic currency")
-    public boolean enableMcaCompatibility = true;
+    public ForgeConfigSpec.BooleanValue generateCurrencyInChests;
 
-    @Config(description = "Whether Numismatic currency should be injected into the loot tables of loot chests")
-    public boolean generateCurrencyInChests = true;
+    public ForgeConfigSpec.IntValue pursePositionX;
 
-    @Config(description = "Where the purse in your inventory should be placed on the X axis")
-    public int pursePositionX = 129;
+    public ForgeConfigSpec.IntValue pursePositionY;
 
-    @Config(description = "Where the purse in your inventory should be placed on the Y axis")
-    public int pursePositionY = 20;
+    public NumismaticOverhaulConfigModel.LootOptions lootOptions;
 
-    @Config
-    public LootOptions_ lootOptions = new LootOptions_();
+    private NumismaticOverhaulConfigModel() {
+        ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
+        this.enableVillagerTrading = builder.comment("Whether villagers should use Numismatic currency for trading").define("enableVillagerTrading", true);
+        this.generateCurrencyInChests = builder.comment("Whether Numismatic currency should be injected ForgeConfigSpec.IntValueo the loot tables of loot chests").define("generateCurrencyInChests", true);
+        this.pursePositionX = builder.comment("Where the purse in your inventory should be placed on the X axis").defineInRange("pursePositionX", 129, 0, Integer.MAX_VALUE);
+        this.pursePositionY = builder.comment("Where the purse in your inventory should be placed on the Y axis").defineInRange("pursePositionY", 20, 0, Integer.MAX_VALUE);
+        this.lootOptions = new LootOptions(builder);
+        this.spec = builder.build();
+    }
 
-    public static class LootOptions_ implements ConfigCore {
-        @Config(description = "Affects money gained from Dungeon and Mineshaft chests")
-        public int desertMinLoot = 300;
-        @Config(description = "Affects money gained from Dungeon and Mineshaft chests")
-        public int desertMaxLoot = 1200;
-        @Config(description = "Affects money gained from Dungeon and Mineshaft chests")
-        public int dungeonMinLoot = 500;
-        @Config(description = "Affects money gained from Dungeon and Mineshaft chests")
-        public int dungeonMaxLoot = 2000;
+    public ForgeConfigSpec getSpec() {
+        return this.spec;
+    }
 
-        @Config(description = "Affects money gained from Bastion, Stronghold, Outpost and Buried Treasure chests")
-        public int structureMinLoot = 1500;
-        public int structureMaxLoot = 4000;
+    public static class LootOptions {
+        public ForgeConfigSpec.IntValue desertMinLoot;
+        public ForgeConfigSpec.IntValue desertMaxLoot;
+        public ForgeConfigSpec.IntValue dungeonMinLoot;
+        public ForgeConfigSpec.IntValue dungeonMaxLoot;
 
-        @Config
-        public int strongholdLibraryMinLoot = 2000;
-        @Config
-        public int strongholdLibraryMaxLoot = 6000;
+        public ForgeConfigSpec.IntValue structureMinLoot;
+        public ForgeConfigSpec.IntValue structureMaxLoot;
+
+        public ForgeConfigSpec.IntValue strongholdLibraryMinLoot;
+        public ForgeConfigSpec.IntValue strongholdLibraryMaxLoot;
+
+        public LootOptions(ForgeConfigSpec.Builder builder) {
+            builder.push("loot");
+            this.desertMinLoot = builder.comment("Affects money gained from Dungeon and Mineshaft chests").defineInRange("desertMinLoot", 300, 0, Integer.MAX_VALUE);
+            this.desertMaxLoot = builder.comment("Affects money gained from Dungeon and Mineshaft chests").defineInRange("desertMaxLoot", 1200, 0, Integer.MAX_VALUE);
+            this.dungeonMinLoot = builder.comment("Affects money gained from Dungeon and Mineshaft chests").defineInRange("dungeonMinLoot", 500, 0, Integer.MAX_VALUE);
+            this.dungeonMaxLoot = builder.comment("Affects money gained from Dungeon and Mineshaft chests").defineInRange("dungeonMaxLoot", 2000, 0, Integer.MAX_VALUE);
+            this.structureMinLoot = builder.comment("Affects money gained from Bastion, Stronghold, Outpost and Buried Treasure chests").defineInRange("structureMinLoot", 1500, 0, Integer.MAX_VALUE);
+            this.structureMaxLoot = builder.comment("Affects money gained from Bastion, Stronghold, Outpost and Buried Treasure chests").defineInRange("structureMaxLoot", 4000, 0, Integer.MAX_VALUE);
+            this.strongholdLibraryMinLoot = builder.defineInRange("strongholdLibraryMinLoot", 2000, 0, Integer.MAX_VALUE);
+            this.strongholdLibraryMaxLoot = builder.defineInRange("strongholdLibraryMaxLoot", 6000, 0, Integer.MAX_VALUE);
+            builder.pop();
+        }
     }
 }

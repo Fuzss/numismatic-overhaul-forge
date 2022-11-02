@@ -13,11 +13,7 @@ import com.glisco.numismaticoverhaul.network.UpdateShopScreenS2CPacket;
 import com.glisco.numismaticoverhaul.villagers.data.VillagerTradesResourceListener;
 import com.glisco.numismaticoverhaul.villagers.json.VillagerTradesHandler;
 import fuzs.puzzleslib.capability.ForgeCapabilityController;
-import fuzs.puzzleslib.config.ConfigHolder;
-import fuzs.puzzleslib.core.CommonFactories;
 import fuzs.puzzleslib.init.CommonGameRuleFactory;
-import fuzs.puzzleslib.init.RegistryManager;
-import fuzs.puzzleslib.init.RegistryReference;
 import fuzs.puzzleslib.network.MessageDirection;
 import fuzs.puzzleslib.network.NetworkHandler;
 import net.minecraft.core.Registry;
@@ -42,8 +38,14 @@ import net.minecraftforge.event.LootTableLoadEvent;
 import net.minecraftforge.event.OnDatapackSyncEvent;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.lifecycle.FMLConstructModEvent;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.network.simple.SimpleChannel;
+import net.minecraftforge.registries.DeferredRegister;
+import net.minecraftforge.registries.RegistryObject;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -54,7 +56,7 @@ public class NumismaticOverhaul {
     public static final String MOD_ID = "numismaticoverhaul";
     public static final Logger LOGGER = LogManager.getLogger(MOD_ID);
 
-    public static final NetworkHandler CHANNEL = CommonFactories.INSTANCE.network(MOD_ID);
+    public static final NetworkHandler CHANNEL = new SimpleChannel();
 //    private static final ParticleSystemController PARTICLE_SYSTEMS = new ParticleSystemController(id("particles"));
 //    public static final ParticleSystem<Integer> PIGGY_BANK_BROKEN = PARTICLE_SYSTEMS.register(Integer.class, (world, pos, data) -> {
 //        ClientParticles.setParticleCount(6 * data);
@@ -65,17 +67,19 @@ public class NumismaticOverhaul {
 //        );
 //    });
 
-    private static final RegistryManager REGISTRY = CommonFactories.INSTANCE.registration(NumismaticOverhaul.MOD_ID);
-    public static final RegistryReference<MenuType<ShopScreenHandler>> SHOP_SCREEN_HANDLER_TYPE = REGISTRY.registerMenuTypeSupplier("shop", () -> ShopScreenHandler::new);
-    public static final RegistryReference<MenuType<PiggyBankScreenHandler>> PIGGY_BANK_SCREEN_HANDLER_TYPE = REGISTRY.registerMenuTypeSupplier("piggy_bank", () -> PiggyBankScreenHandler::new);
+    private static final DeferredRegister<MenuType<?>> MENU_TYPE_DEFERRED_REGISTER = DeferredRegister.create(Registry.MENU_REGISTRY, MOD_ID);
+    private static final DeferredRegister<SoundEvent> SOUND_EVENT_DEFERRED_REGISTER = DeferredRegister.create(Registry.SOUND_EVENT_REGISTRY, MOD_ID);
+    private static final DeferredRegister<LootPoolEntryType> LOOT_POOL_ENTRY_TYPE_DEFERRED_REGISTER = DeferredRegister.create(Registry.LOOT_ENTRY_REGISTRY, MOD_ID);
+    public static final RegistryObject<MenuType<ShopScreenHandler>> SHOP_SCREEN_HANDLER_TYPE = MENU_TYPE_DEFERRED_REGISTER.register("shop", () -> new MenuType<>(ShopScreenHandler::new));
+    public static final RegistryObject<MenuType<PiggyBankScreenHandler>> PIGGY_BANK_SCREEN_HANDLER_TYPE = MENU_TYPE_DEFERRED_REGISTER.register("piggy_bank", () -> new MenuType<>(PiggyBankScreenHandler::new));
 
-    public static final RegistryReference<SoundEvent> PIGGY_BANK_BREAK = REGISTRY.registerRawSoundEvent("piggy_bank_break");
-    public static final RegistryReference<LootPoolEntryType> MONEY_BAG_ENTRY = REGISTRY.register(Registry.LOOT_ENTRY_REGISTRY, "money_bag", () -> new LootPoolEntryType(new MoneyBagLootEntry.Serializer()));
+    public static final RegistryObject<SoundEvent> PIGGY_BANK_BREAK = SOUND_EVENT_DEFERRED_REGISTER.register("piggy_bank_break", () -> new SoundEvent(new ResourceLocation(MOD_ID, "piggy_bank_break")));
+    public static final RegistryObject<LootPoolEntryType> MONEY_BAG_ENTRY = LOOT_POOL_ENTRY_TYPE_DEFERRED_REGISTER.register("money_bag", () -> new LootPoolEntryType(new MoneyBagLootEntry.Serializer()));
 
     public static final TagKey<EntityType<?>> THE_BOURGEOISIE = TagKey.create(Registry.ENTITY_TYPE_REGISTRY, id("the_bourgeoisie"));
     public static final TagKey<Block> VERY_HEAVY_BLOCKS = TagKey.create(Registry.BLOCK_REGISTRY, id("very_heavy_blocks"));
 
-    public static final GameRules.Key<GameRules.IntegerValue> MONEY_DROP_PERCENTAGE = CommonGameRuleFactory.INSTANCE.register("moneyDropPercentage", GameRules.Category.PLAYER, CommonGameRuleFactory.INSTANCE.createIntRule(10));
+    public static final GameRules.Key<GameRules.IntegerValue> MONEY_DROP_PERCENTAGE = GameRules.register("moneyDropPercentage", GameRules.Category.PLAYER, CommonGameRuleFactory.INSTANCE.createIntRule(10));
 
     public static final CreativeModeTab NUMISMATIC_GROUP = new CreativeModeTab("numismaticoverhaul.main") {
         @Override
@@ -84,11 +88,14 @@ public class NumismaticOverhaul {
         }
     };
 
-    public static final ConfigHolder CONFIG = CommonFactories.INSTANCE.clientConfig(NumismaticOverhaulConfigModel.class, () -> new NumismaticOverhaulConfigModel());
-
     @SubscribeEvent
     public static void onConstructMod(final FMLConstructModEvent evt_) {
-        CONFIG.bakeConfigs(MOD_ID);
+        MENU_TYPE_DEFERRED_REGISTER.register(FMLJavaModLoadingContext.get().getModEventBus());
+        SOUND_EVENT_DEFERRED_REGISTER.register(FMLJavaModLoadingContext.get().getModEventBus());
+        LOOT_POOL_ENTRY_TYPE_DEFERRED_REGISTER.register(FMLJavaModLoadingContext.get().getModEventBus());
+
+
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, NumismaticOverhaulConfigModel.INSTANCE.getSpec());
         ModComponents.touch();
         ForgeCapabilityController.setCapabilityToken(ModComponents.CURRENCY, new CapabilityToken<CurrencyComponent>() {});
 
@@ -128,43 +135,44 @@ public class NumismaticOverhaul {
 
 //        NUMISMATIC_GROUP.initialize();
 
-//        if (CONFIG.get(NumismaticOverhaulConfigModel.class).generateCurrencyInChests) {
+//        if (NumismaticOverhaulConfigModel.INSTANCE.generateCurrencyInChests) {
 //            LootOps.injectItem(NumismaticOverhaulItems.GOLD_COIN, .01f, BuiltInLootTables.STRONGHOLD_LIBRARY, BuiltInLootTables.BASTION_TREASURE, BuiltInLootTables.STRONGHOLD_CORRIDOR,
 //                    BuiltInLootTables.PILLAGER_OUTPOST, BuiltInLootTables.BURIED_TREASURE, BuiltInLootTables.SIMPLE_DUNGEON, BuiltInLootTables.ABANDONED_MINESHAFT);
 //
 //            LootTableEvents.MODIFY.register((resourceManager, lootManager, id, tableBuilder, source) -> {
 //                if (anyMatch(id, BuiltInLootTables.DESERT_PYRAMID)) {
-//                    tableBuilder.withPool(LootPool.lootPool().add(MoneyBagLootEntry.builder(CONFIG.get(NumismaticOverhaulConfigModel.class).lootOptions.desertMinLoot, CONFIG.get(NumismaticOverhaulConfigModel.class).lootOptions.desertMaxLoot))
+//                    tableBuilder.withPool(LootPool.lootPool().add(MoneyBagLootEntry.builder(NumismaticOverhaulConfigModel.INSTANCE.lootOptions.desertMinLoot, NumismaticOverhaulConfigModel.INSTANCE.lootOptions.desertMaxLoot))
 //                            .conditionally(LootItemRandomChanceCondition.randomChance(0.45f)));
 //                } else if (anyMatch(id, BuiltInLootTables.SIMPLE_DUNGEON, BuiltInLootTables.ABANDONED_MINESHAFT)) {
-//                    tableBuilder.withPool(LootPool.lootPool().add(MoneyBagLootEntry.builder(CONFIG.get(NumismaticOverhaulConfigModel.class).lootOptions.dungeonMinLoot, CONFIG.get(NumismaticOverhaulConfigModel.class).lootOptions.dungeonMaxLoot))
+//                    tableBuilder.withPool(LootPool.lootPool().add(MoneyBagLootEntry.builder(NumismaticOverhaulConfigModel.INSTANCE.lootOptions.dungeonMinLoot, NumismaticOverhaulConfigModel.INSTANCE.lootOptions.dungeonMaxLoot))
 //                            .conditionally(LootItemRandomChanceCondition.randomChance(0.75f)));
 //                } else if (anyMatch(id, BuiltInLootTables.BASTION_TREASURE, BuiltInLootTables.STRONGHOLD_CORRIDOR, BuiltInLootTables.PILLAGER_OUTPOST, BuiltInLootTables.BURIED_TREASURE)) {
-//                    tableBuilder.withPool(LootPool.lootPool().add(MoneyBagLootEntry.builder(CONFIG.get(NumismaticOverhaulConfigModel.class).lootOptions.structureMinLoot, CONFIG.get(NumismaticOverhaulConfigModel.class).lootOptions.structureMaxLoot))
+//                    tableBuilder.withPool(LootPool.lootPool().add(MoneyBagLootEntry.builder(NumismaticOverhaulConfigModel.INSTANCE.lootOptions.structureMinLoot, NumismaticOverhaulConfigModel.INSTANCE.lootOptions.structureMaxLoot))
 //                            .conditionally(LootItemRandomChanceCondition.randomChance(0.75f)));
 //                } else if (anyMatch(id, BuiltInLootTables.STRONGHOLD_LIBRARY)) {
-//                    tableBuilder.withPool(LootPool.lootPool().add(MoneyBagLootEntry.builder(CONFIG.get(NumismaticOverhaulConfigModel.class).lootOptions.strongholdLibraryMinLoot, CONFIG.get(NumismaticOverhaulConfigModel.class).lootOptions.strongholdLibraryMaxLoot))
+//                    tableBuilder.withPool(LootPool.lootPool().add(MoneyBagLootEntry.builder(NumismaticOverhaulConfigModel.INSTANCE.lootOptions.strongholdLibraryMinLoot, NumismaticOverhaulConfigModel.INSTANCE.lootOptions.strongholdLibraryMaxLoot))
 //                            .conditionally(LootItemRandomChanceCondition.randomChance(0.85f)));
 //                }
 //            });
 //        }
 
         MinecraftForge.EVENT_BUS.addListener((final LootTableLoadEvent evt) -> {
+            if (!NumismaticOverhaulConfigModel.INSTANCE.generateCurrencyInChests.get()) return;
             ResourceLocation id = evt.getName();
             if (anyMatch(id, BuiltInLootTables.STRONGHOLD_LIBRARY, BuiltInLootTables.BASTION_TREASURE, BuiltInLootTables.STRONGHOLD_CORRIDOR, BuiltInLootTables.PILLAGER_OUTPOST, BuiltInLootTables.BURIED_TREASURE, BuiltInLootTables.SIMPLE_DUNGEON, BuiltInLootTables.ABANDONED_MINESHAFT)) {
                 evt.getTable().addPool(LootPool.lootPool().add(LootItem.lootTableItem(NumismaticOverhaulItems.GOLD_COIN.get()).when(LootItemRandomChanceCondition.randomChance(0.01f))).build());
             }
             if (anyMatch(id, BuiltInLootTables.DESERT_PYRAMID)) {
-                evt.getTable().addPool(LootPool.lootPool().add(MoneyBagLootEntry.builder(CONFIG.get(NumismaticOverhaulConfigModel.class).lootOptions.desertMinLoot, CONFIG.get(NumismaticOverhaulConfigModel.class).lootOptions.desertMaxLoot))
+                evt.getTable().addPool(LootPool.lootPool().add(MoneyBagLootEntry.builder(NumismaticOverhaulConfigModel.INSTANCE.lootOptions.desertMinLoot.get(), NumismaticOverhaulConfigModel.INSTANCE.lootOptions.desertMaxLoot.get()))
                         .when(LootItemRandomChanceCondition.randomChance(0.45f)).build());
             } else if (anyMatch(id, BuiltInLootTables.SIMPLE_DUNGEON, BuiltInLootTables.ABANDONED_MINESHAFT)) {
-                evt.getTable().addPool(LootPool.lootPool().add(MoneyBagLootEntry.builder(CONFIG.get(NumismaticOverhaulConfigModel.class).lootOptions.dungeonMinLoot, CONFIG.get(NumismaticOverhaulConfigModel.class).lootOptions.dungeonMaxLoot))
+                evt.getTable().addPool(LootPool.lootPool().add(MoneyBagLootEntry.builder(NumismaticOverhaulConfigModel.INSTANCE.lootOptions.dungeonMinLoot.get(), NumismaticOverhaulConfigModel.INSTANCE.lootOptions.dungeonMaxLoot.get()))
                         .when(LootItemRandomChanceCondition.randomChance(0.75f)).build());
             } else if (anyMatch(id, BuiltInLootTables.BASTION_TREASURE, BuiltInLootTables.STRONGHOLD_CORRIDOR, BuiltInLootTables.PILLAGER_OUTPOST, BuiltInLootTables.BURIED_TREASURE)) {
-                evt.getTable().addPool(LootPool.lootPool().add(MoneyBagLootEntry.builder(CONFIG.get(NumismaticOverhaulConfigModel.class).lootOptions.structureMinLoot, CONFIG.get(NumismaticOverhaulConfigModel.class).lootOptions.structureMaxLoot))
+                evt.getTable().addPool(LootPool.lootPool().add(MoneyBagLootEntry.builder(NumismaticOverhaulConfigModel.INSTANCE.lootOptions.structureMinLoot.get(), NumismaticOverhaulConfigModel.INSTANCE.lootOptions.structureMaxLoot.get()))
                         .when(LootItemRandomChanceCondition.randomChance(0.75f)).build());
             } else if (anyMatch(id, BuiltInLootTables.STRONGHOLD_LIBRARY)) {
-                evt.getTable().addPool(LootPool.lootPool().add(MoneyBagLootEntry.builder(CONFIG.get(NumismaticOverhaulConfigModel.class).lootOptions.strongholdLibraryMinLoot, CONFIG.get(NumismaticOverhaulConfigModel.class).lootOptions.strongholdLibraryMaxLoot))
+                evt.getTable().addPool(LootPool.lootPool().add(MoneyBagLootEntry.builder(NumismaticOverhaulConfigModel.INSTANCE.lootOptions.strongholdLibraryMinLoot.get(), NumismaticOverhaulConfigModel.INSTANCE.lootOptions.strongholdLibraryMaxLoot.get()))
                         .when(LootItemRandomChanceCondition.randomChance(0.85f)).build());
             }
         });

@@ -190,9 +190,6 @@ dependencies {
     runtimeOnly fg.deobf("fuzs.bettermodsbutton:bettermodsbutton-forge:4.2.0")
 //    runtimeOnly fg.deobf("curse.maven:configmenusforge-544048:3822820")
 //    runtimeOnly fg.deobf("curse.maven:configured-457570:3903908")
-
-    // Puzzles Lib
-    implementation fg.deobf("fuzs.puzzleslib:puzzleslib-forge:4.3.12")
 }
 
 // Example for how to get properties into the manifest for reading at runtime.
