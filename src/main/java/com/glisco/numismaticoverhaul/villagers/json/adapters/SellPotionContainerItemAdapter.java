@@ -4,24 +4,24 @@ import com.glisco.numismaticoverhaul.currency.CurrencyHelper;
 import com.glisco.numismaticoverhaul.villagers.json.TradeJsonAdapter;
 import com.glisco.numismaticoverhaul.villagers.json.VillagerJsonHelper;
 import com.google.gson.JsonObject;
-import net.minecraft.entity.Entity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.potion.Potion;
-import net.minecraft.potion.PotionUtil;
-import net.minecraft.recipe.BrewingRecipeRegistry;
-import net.minecraft.util.math.random.Random;
-import net.minecraft.util.registry.Registry;
-import net.minecraft.village.TradeOffer;
-import net.minecraft.village.TradeOffers;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
+import net.minecraft.core.Registry;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.npc.VillagerTrades;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.alchemy.Potion;
+import net.minecraft.world.item.alchemy.PotionBrewing;
+import net.minecraft.world.item.alchemy.PotionUtils;
+import net.minecraft.world.item.trading.MerchantOffer;
 
 public class SellPotionContainerItemAdapter extends TradeJsonAdapter {
 
     @Override
     @NotNull
-    public TradeOffers.Factory deserialize(JsonObject json) {
+    public VillagerTrades.ItemListing deserialize(JsonObject json) {
 
         loadDefaultStats(json, true);
 
@@ -35,7 +35,7 @@ public class SellPotionContainerItemAdapter extends TradeJsonAdapter {
         return new Factory(container_item, buy_item, price, max_uses, villager_experience, price_multiplier);
     }
 
-    private static class Factory implements TradeOffers.Factory {
+    private static class Factory implements VillagerTrades.ItemListing {
         private final ItemStack containerItem;
         private final ItemStack buyItem;
 
@@ -54,12 +54,12 @@ public class SellPotionContainerItemAdapter extends TradeJsonAdapter {
             this.priceMultiplier = priceMultiplier;
         }
 
-        public TradeOffer create(Entity entity, Random random) {
-            List<Potion> list = Registry.POTION.stream().filter((potion) -> !potion.getEffects().isEmpty() && BrewingRecipeRegistry.isBrewable(potion)).toList();
+        public MerchantOffer getOffer(Entity entity, RandomSource random) {
+            List<Potion> list = Registry.POTION.stream().filter((potion) -> !potion.getEffects().isEmpty() && PotionBrewing.isBrewablePotion(potion)).toList();
 
             Potion potion = list.get(random.nextInt(list.size()));
-            ItemStack itemStack2 = PotionUtil.setPotion(containerItem.copy(), potion);
-            return new TradeOffer(CurrencyHelper.getClosest(price), buyItem, itemStack2, this.maxUses, this.experience, this.priceMultiplier);
+            ItemStack itemStack2 = PotionUtils.setPotion(containerItem.copy(), potion);
+            return new MerchantOffer(CurrencyHelper.getClosest(price), buyItem, itemStack2, this.maxUses, this.experience, this.priceMultiplier);
         }
     }
 }

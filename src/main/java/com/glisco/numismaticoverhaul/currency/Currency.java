@@ -1,10 +1,10 @@
 package com.glisco.numismaticoverhaul.currency;
 
 import com.glisco.numismaticoverhaul.item.NumismaticOverhaulItems;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemConvertible;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.ItemLike;
 
-public enum Currency implements ItemConvertible {
+public enum Currency implements ItemLike {
     BRONZE {
         @Override
         public int getNameColor() {
@@ -18,7 +18,7 @@ public enum Currency implements ItemConvertible {
 
         @Override
         public Item asItem() {
-            return NumismaticOverhaulItems.BRONZE_COIN;
+            return NumismaticOverhaulItems.BRONZE_COIN.get();
         }
     }, SILVER {
         @Override
@@ -33,7 +33,7 @@ public enum Currency implements ItemConvertible {
 
         @Override
         public Item asItem() {
-            return NumismaticOverhaulItems.SILVER_COIN;
+            return NumismaticOverhaulItems.SILVER_COIN.get();
         }
     }, GOLD {
         @Override
@@ -48,7 +48,7 @@ public enum Currency implements ItemConvertible {
 
         @Override
         public Item asItem() {
-            return NumismaticOverhaulItems.GOLD_COIN;
+            return NumismaticOverhaulItems.GOLD_COIN.get();
         }
     };
 

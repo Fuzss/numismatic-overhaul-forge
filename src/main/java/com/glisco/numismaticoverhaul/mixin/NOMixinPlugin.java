@@ -1,6 +1,5 @@
 package com.glisco.numismaticoverhaul.mixin;
 
-import net.fabricmc.loader.api.FabricLoader;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
@@ -21,8 +20,8 @@ public class NOMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
-        if (mixinClassName.contains("InventorioScreenMixin")) return FabricLoader.getInstance().isModLoaded("inventorio");
-        if (mixinClassName.contains("MCAVillageMixin")) return FabricLoader.getInstance().isModLoaded("mca");
+//        if (mixinClassName.contains("InventorioScreenMixin")) return FabricLoader.getInstance().isModLoaded("inventorio");
+//        if (mixinClassName.contains("MCAVillageMixin")) return FabricLoader.getInstance().isModLoaded("mca");
         return true;
     }
 

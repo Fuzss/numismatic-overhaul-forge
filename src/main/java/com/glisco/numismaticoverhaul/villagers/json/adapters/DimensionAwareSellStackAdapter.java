@@ -4,18 +4,18 @@ import com.glisco.numismaticoverhaul.currency.CurrencyHelper;
 import com.glisco.numismaticoverhaul.villagers.json.TradeJsonAdapter;
 import com.glisco.numismaticoverhaul.villagers.json.VillagerJsonHelper;
 import com.google.gson.JsonObject;
-import net.minecraft.entity.Entity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.random.Random;
-import net.minecraft.village.TradeOffer;
-import net.minecraft.village.TradeOffers;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.npc.VillagerTrades;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.trading.MerchantOffer;
 import org.jetbrains.annotations.NotNull;
 
 public class DimensionAwareSellStackAdapter extends TradeJsonAdapter {
 
     @Override
     @NotNull
-    public TradeOffers.Factory deserialize(JsonObject json) {
+    public VillagerTrades.ItemListing deserialize(JsonObject json) {
 
         loadDefaultStats(json, true);
 
@@ -30,7 +30,7 @@ public class DimensionAwareSellStackAdapter extends TradeJsonAdapter {
         return new Factory(sell, price, dimension, max_uses, villager_experience, price_multiplier);
     }
 
-    private static class Factory implements TradeOffers.Factory {
+    private static class Factory implements VillagerTrades.ItemListing {
         private final ItemStack sell;
         private final int maxUses;
         private final int experience;
@@ -47,10 +47,10 @@ public class DimensionAwareSellStackAdapter extends TradeJsonAdapter {
             this.targetDimensionId = targetDimensionId;
         }
 
-        public TradeOffer create(Entity entity, Random random) {
-            if (!entity.world.getRegistryKey().getValue().toString().equals(targetDimensionId)) return null;
+        public MerchantOffer getOffer(Entity entity, RandomSource random) {
+            if (!entity.level.dimension().location().toString().equals(targetDimensionId)) return null;
 
-            return new TradeOffer(CurrencyHelper.getClosest(price), sell, this.maxUses, this.experience, multiplier);
+            return new MerchantOffer(CurrencyHelper.getClosest(price), sell, this.maxUses, this.experience, multiplier);
         }
     }
 }

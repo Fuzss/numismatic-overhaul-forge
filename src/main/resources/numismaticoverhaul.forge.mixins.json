@@ -1,0 +1,23 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.glisco.numismaticoverhaul.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "BundleItemMixin",
+    "LivingEntityMixin",
+    "MerchantScreenHandlerMixin",
+    "ServerPlayerEntityMixin",
+    "ServerWorldMixin",
+    "TradeOfferListMixin",
+    "TradeOfferMixin",
+    "VillagerEntityMixin"
+  ],
+  "client": [
+    "InventoryScreenMixin",
+    "MerchantScreenMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

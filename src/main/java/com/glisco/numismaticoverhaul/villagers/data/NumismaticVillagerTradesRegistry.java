@@ -1,9 +1,9 @@
 package com.glisco.numismaticoverhaul.villagers.data;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import net.minecraft.util.Pair;
-import net.minecraft.village.TradeOffers;
-import net.minecraft.village.VillagerProfession;
+import net.minecraft.util.Tuple;
+import net.minecraft.world.entity.npc.VillagerProfession;
+import net.minecraft.world.entity.npc.VillagerTrades;
 import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.*;
@@ -11,31 +11,31 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class NumismaticVillagerTradesRegistry {
 
-    private static final HashMap<VillagerProfession, Int2ObjectOpenHashMap<List<TradeOffers.Factory>>> TRADES_REGISTRY = new HashMap<>();
-    private static final Int2ObjectOpenHashMap<List<TradeOffers.Factory>> WANDERING_TRADER_REGISTRY = new Int2ObjectOpenHashMap<>();
+    private static final HashMap<VillagerProfession, Int2ObjectOpenHashMap<List<VillagerTrades.ItemListing>>> TRADES_REGISTRY = new HashMap<>();
+    private static final Int2ObjectOpenHashMap<List<VillagerTrades.ItemListing>> WANDERING_TRADER_REGISTRY = new Int2ObjectOpenHashMap<>();
 
-    private static final HashMap<VillagerProfession, Int2ObjectOpenHashMap<List<TradeOffers.Factory>>> REMAPPED_FABRIC_TRADES = new HashMap<>();
-    private static final Int2ObjectOpenHashMap<List<TradeOffers.Factory>> REMAPPED_FABRIC_WANDERING_TRADER_TRADES = new Int2ObjectOpenHashMap<>();
+    private static final HashMap<VillagerProfession, Int2ObjectOpenHashMap<List<VillagerTrades.ItemListing>>> REMAPPED_FABRIC_TRADES = new HashMap<>();
+    private static final Int2ObjectOpenHashMap<List<VillagerTrades.ItemListing>> REMAPPED_FABRIC_WANDERING_TRADER_TRADES = new Int2ObjectOpenHashMap<>();
 
     private static final AtomicBoolean MOD_VILLAGERS_WRAPPED = new AtomicBoolean(false);
 
     // -- Fabric API trades - these are stored persistently --
 
-    public static void registerFabricVillagerTrades(VillagerProfession profession, int level, List<TradeOffers.Factory> factories) {
+    public static void registerFabricVillagerTrades(VillagerProfession profession, int level, List<VillagerTrades.ItemListing> factories) {
         getVillagerTradeList(REMAPPED_FABRIC_TRADES, profession, level).addAll(factories.stream().map(RemappingTradeWrapper::wrap).toList());
     }
 
-    public static void registerFabricWanderingTraderTrades(int level, List<TradeOffers.Factory> factories) {
+    public static void registerFabricWanderingTraderTrades(int level, List<VillagerTrades.ItemListing> factories) {
         getOrDefaultAndAdd(REMAPPED_FABRIC_WANDERING_TRADER_TRADES, level, new ArrayList<>()).addAll(factories.stream().map(RemappingTradeWrapper::wrap).toList());
     }
 
     // -- NO datapack trades - this registry is cleared on reload--
 
-    public static void registerVillagerTrade(VillagerProfession profession, int level, TradeOffers.Factory trade) {
+    public static void registerVillagerTrade(VillagerProfession profession, int level, VillagerTrades.ItemListing trade) {
         getVillagerTradeList(TRADES_REGISTRY, profession, level).add(trade);
     }
 
-    public static void registerWanderingTraderTrade(int level, TradeOffers.Factory trade) {
+    public static void registerWanderingTraderTrade(int level, VillagerTrades.ItemListing trade) {
         getOrDefaultAndAdd(WANDERING_TRADER_REGISTRY, level, new ArrayList<>()).add(trade);
     }
 
@@ -44,7 +44,7 @@ public class NumismaticVillagerTradesRegistry {
     public static void wrapModVillagers() {
         if (MOD_VILLAGERS_WRAPPED.get()) return;
 
-        TradeOffers.PROFESSION_TO_LEVELED_TRADE.forEach((profession, int2TradesMap) -> {
+        VillagerTrades.TRADES.forEach((profession, int2TradesMap) -> {
             if (TRADES_REGISTRY.containsKey(profession)) return;
             int2TradesMap.forEach((integer, factories) -> {
                 registerFabricVillagerTrades(profession, integer, Arrays.asList(factories));
@@ -54,8 +54,8 @@ public class NumismaticVillagerTradesRegistry {
         MOD_VILLAGERS_WRAPPED.set(true);
     }
 
-    private static List<TradeOffers.Factory> getVillagerTradeList(HashMap<VillagerProfession, Int2ObjectOpenHashMap<List<TradeOffers.Factory>>> registry, VillagerProfession profession, int level) {
-        Int2ObjectOpenHashMap<List<TradeOffers.Factory>> villagerMap = getOrDefaultAndAdd(registry, profession, new Int2ObjectOpenHashMap<>());
+    private static List<VillagerTrades.ItemListing> getVillagerTradeList(HashMap<VillagerProfession, Int2ObjectOpenHashMap<List<VillagerTrades.ItemListing>>> registry, VillagerProfession profession, int level) {
+        Int2ObjectOpenHashMap<List<VillagerTrades.ItemListing>> villagerMap = getOrDefaultAndAdd(registry, profession, new Int2ObjectOpenHashMap<>());
         return getOrDefaultAndAdd(villagerMap, level, new ArrayList<>());
     }
 
@@ -70,7 +70,7 @@ public class NumismaticVillagerTradesRegistry {
         WANDERING_TRADER_REGISTRY.clear();
     }
 
-    public static Pair<HashMap<VillagerProfession, Int2ObjectOpenHashMap<TradeOffers.Factory[]>>, Int2ObjectOpenHashMap<TradeOffers.Factory[]>> getRegistryForLoading() {
+    public static Tuple<HashMap<VillagerProfession, Int2ObjectOpenHashMap<VillagerTrades.ItemListing[]>>, Int2ObjectOpenHashMap<VillagerTrades.ItemListing[]>> getRegistryForLoading() {
 
         final var processor = RegistryProcessor.begin();
 
@@ -88,8 +88,8 @@ public class NumismaticVillagerTradesRegistry {
 
     private static class RegistryProcessor {
 
-        private final HashMap<VillagerProfession, Int2ObjectOpenHashMap<TradeOffers.Factory[]>> villagerTrades;
-        private final Int2ObjectOpenHashMap<TradeOffers.Factory[]> wanderingTraderTrades;
+        private final HashMap<VillagerProfession, Int2ObjectOpenHashMap<VillagerTrades.ItemListing[]>> villagerTrades;
+        private final Int2ObjectOpenHashMap<VillagerTrades.ItemListing[]> wanderingTraderTrades;
 
         private RegistryProcessor() {
             this.villagerTrades = new HashMap<>();
@@ -100,24 +100,24 @@ public class NumismaticVillagerTradesRegistry {
             return new RegistryProcessor();
         }
 
-        public void processProfession(VillagerProfession profession, Int2ObjectOpenHashMap<List<TradeOffers.Factory>> professionTradesPerLevel) {
-            Int2ObjectOpenHashMap<TradeOffers.Factory[]> factories = villagerTrades.getOrDefault(profession, new Int2ObjectOpenHashMap<>());
+        public void processProfession(VillagerProfession profession, Int2ObjectOpenHashMap<List<VillagerTrades.ItemListing>> professionTradesPerLevel) {
+            Int2ObjectOpenHashMap<VillagerTrades.ItemListing[]> factories = villagerTrades.getOrDefault(profession, new Int2ObjectOpenHashMap<>());
 
             professionTradesPerLevel.forEach((level, factoryList) -> {
-                final var oldFactories = factories.getOrDefault(level.intValue(), new TradeOffers.Factory[0]);
-                factories.put(level.intValue(), ArrayUtils.addAll(oldFactories, factoryList.toArray(new TradeOffers.Factory[0])));
+                final var oldFactories = factories.getOrDefault(level.intValue(), new VillagerTrades.ItemListing[0]);
+                factories.put(level.intValue(), ArrayUtils.addAll(oldFactories, factoryList.toArray(new VillagerTrades.ItemListing[0])));
             });
 
             villagerTrades.put(profession, factories);
         }
 
-        public void processWanderingTrader(Integer level, List<TradeOffers.Factory> trades) {
-            final var oldFactories = wanderingTraderTrades.getOrDefault(level.intValue(), new TradeOffers.Factory[0]);
-            wanderingTraderTrades.put(level.intValue(), ArrayUtils.addAll(oldFactories, trades.toArray(new TradeOffers.Factory[0])));
+        public void processWanderingTrader(Integer level, List<VillagerTrades.ItemListing> trades) {
+            final var oldFactories = wanderingTraderTrades.getOrDefault(level.intValue(), new VillagerTrades.ItemListing[0]);
+            wanderingTraderTrades.put(level.intValue(), ArrayUtils.addAll(oldFactories, trades.toArray(new VillagerTrades.ItemListing[0])));
         }
 
-        public Pair<HashMap<VillagerProfession, Int2ObjectOpenHashMap<TradeOffers.Factory[]>>, Int2ObjectOpenHashMap<TradeOffers.Factory[]>> finish() {
-            return new Pair<>(villagerTrades, wanderingTraderTrades);
+        public Tuple<HashMap<VillagerProfession, Int2ObjectOpenHashMap<VillagerTrades.ItemListing[]>>, Int2ObjectOpenHashMap<VillagerTrades.ItemListing[]>> finish() {
+            return new Tuple<>(villagerTrades, wanderingTraderTrades);
         }
 
     }

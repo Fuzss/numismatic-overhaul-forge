@@ -3,10 +3,10 @@ package com.glisco.numismaticoverhaul.currency;
 import com.glisco.numismaticoverhaul.item.CoinItem;
 import com.glisco.numismaticoverhaul.item.CurrencyItem;
 import com.glisco.numismaticoverhaul.item.MoneyBagItem;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,18 +20,18 @@ public class CurrencyHelper {
      * @param remove Whether to remove all coins from the player in the process
      * @return The amount of currency contained in the player's inventory
      */
-    public static long getMoneyInInventory(PlayerEntity player, boolean remove) {
+    public static long getMoneyInInventory(Player player, boolean remove) {
 
         long value = 0;
 
-        for (int i = 0; i < player.getInventory().size(); i++) {
-            ItemStack stack = player.getInventory().getStack(i);
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            ItemStack stack = player.getInventory().getItem(i);
             if (isCombined(stack)) continue;
             if (!(stack.getItem() instanceof CurrencyItem currencyItem)) continue;
 
             value += currencyItem.getValue(stack);
 
-            if (remove) player.getInventory().removeOne(stack);
+            if (remove) player.getInventory().removeItem(stack);
         }
 
         return value;
@@ -47,13 +47,13 @@ public class CurrencyHelper {
         }).sum();
     }
 
-    public static void offerAsCoins(PlayerEntity player, long value) {
+    public static void offerAsCoins(Player player, long value) {
         for (ItemStack itemStack : CurrencyConverter.getAsValidStacks(value)) {
-            player.getInventory().offerOrDrop(itemStack);
+            player.getInventory().placeItemBackInInventory(itemStack);
         }
     }
 
-    public static boolean deduceFromInventory(PlayerEntity player, long value) {
+    public static boolean deduceFromInventory(Player player, long value) {
         long presentInInventory = getMoneyInInventory(player, false);
         if (presentInInventory < value) return false;
 
@@ -97,9 +97,9 @@ public class CurrencyHelper {
         return CurrencyConverter.getAsItemStackList(CurrencyResolver.combineValues(values)).get(0);
     }
 
-    public static long[] getFromNbt(NbtCompound nbt, String key) {
-        if (nbt.contains(key, NbtElement.LONG_ARRAY_TYPE)) return nbt.getLongArray(key);
-        if (!nbt.contains(key, NbtElement.INT_ARRAY_TYPE)) return new long[0];
+    public static long[] getFromNbt(CompoundTag nbt, String key) {
+        if (nbt.contains(key, Tag.TAG_LONG_ARRAY)) return nbt.getLongArray(key);
+        if (!nbt.contains(key, Tag.TAG_INT_ARRAY)) return new long[0];
 
         var intArray = nbt.getIntArray(key);
         var longArray = new long[intArray.length];
@@ -111,7 +111,7 @@ public class CurrencyHelper {
     }
 
     private static boolean isCombined(ItemStack stack) {
-        return stack.hasNbt() && stack.getNbt().contains("Combined", NbtElement.BYTE_TYPE);
+        return stack.hasTag() && stack.getTag().contains("Combined", Tag.TAG_BYTE);
     }
 
 }

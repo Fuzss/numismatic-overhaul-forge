@@ -5,12 +5,12 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.mojang.brigadier.StringReader;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.StringNbtReader;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.registry.Registry;
+import net.minecraft.core.Registry;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.TagParser;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 
 public class VillagerJsonHelper {
 
@@ -74,22 +74,22 @@ public class VillagerJsonHelper {
         if (json.has("tag")) {
 
             String toParse = json.get("tag").getAsJsonObject().toString();
-            NbtCompound stackTag = null;
+            CompoundTag stackTag = null;
 
             try {
-                stackTag = new StringNbtReader(new StringReader(toParse)).parseCompound();
+                stackTag = new TagParser(new StringReader(toParse)).readStruct();
             } catch (CommandSyntaxException e) {
                 VillagerTradesHandler.addLoadingException(new DeserializationException("Tag parsing error: " + e.getMessage()));
             }
 
-            if (stackTag != null) stack.setNbt(stackTag);
+            if (stackTag != null) stack.setTag(stackTag);
         }
 
         return stack;
     }
 
     public static Item getItemFromID(String id) {
-        return Registry.ITEM.getOrEmpty(Identifier.tryParse(id)).orElseThrow(() -> new DeserializationException("Invalid item: \"" + id + "\""));
+        return Registry.ITEM.getOptional(ResourceLocation.tryParse(id)).orElseThrow(() -> new DeserializationException("Invalid item: \"" + id + "\""));
     }
 
     public static <T> T deepCopy(T object, Class<T> type) {

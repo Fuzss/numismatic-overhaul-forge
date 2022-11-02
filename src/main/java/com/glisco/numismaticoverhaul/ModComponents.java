@@ -1,19 +1,19 @@
 package com.glisco.numismaticoverhaul;
 
 import com.glisco.numismaticoverhaul.currency.CurrencyComponent;
-import dev.onyxstudios.cca.api.v3.component.ComponentKey;
-import dev.onyxstudios.cca.api.v3.component.ComponentRegistry;
-import dev.onyxstudios.cca.api.v3.entity.EntityComponentFactoryRegistry;
-import dev.onyxstudios.cca.api.v3.entity.EntityComponentInitializer;
-import dev.onyxstudios.cca.api.v3.entity.RespawnCopyStrategy;
-import net.minecraft.util.Identifier;
+import fuzs.puzzleslib.capability.CapabilityController;
+import fuzs.puzzleslib.capability.data.PlayerCapabilityKey;
+import fuzs.puzzleslib.capability.data.PlayerRespawnStrategy;
+import fuzs.puzzleslib.capability.data.SyncStrategy;
+import fuzs.puzzleslib.core.CommonFactories;
+import net.minecraft.world.entity.player.Player;
 
-public class ModComponents implements EntityComponentInitializer {
+public class ModComponents {
+    private static final CapabilityController CAPABILITY = CommonFactories.INSTANCE.capabilities(NumismaticOverhaul.MOD_ID);
 
-    public static final ComponentKey<CurrencyComponent> CURRENCY = ComponentRegistry.getOrCreate(new Identifier("numismatic-overhaul", "currency"), CurrencyComponent.class);
+    public static final PlayerCapabilityKey<CurrencyComponent> CURRENCY = CAPABILITY.registerPlayerCapability("currency", CurrencyComponent.class, (Object provider) -> new CurrencyComponent((Player) provider), PlayerRespawnStrategy.ALWAYS_COPY, SyncStrategy.SELF);
 
-    @Override
-    public void registerEntityComponentFactories(EntityComponentFactoryRegistry registry) {
-        registry.registerForPlayers(CURRENCY, CurrencyComponent::new, RespawnCopyStrategy.ALWAYS_COPY);
+    public static void touch() {
+
     }
 }

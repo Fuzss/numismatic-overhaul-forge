@@ -5,23 +5,23 @@ import com.glisco.numismaticoverhaul.villagers.json.TradeJsonAdapter;
 import com.glisco.numismaticoverhaul.villagers.json.VillagerJsonHelper;
 import com.google.common.collect.Lists;
 import com.google.gson.JsonObject;
-import net.minecraft.entity.Entity;
-import net.minecraft.item.DyeItem;
-import net.minecraft.item.DyeableItem;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.DyeColor;
-import net.minecraft.util.math.random.Random;
-import net.minecraft.village.TradeOffer;
-import net.minecraft.village.TradeOffers;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.npc.VillagerTrades;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.item.DyeItem;
+import net.minecraft.world.item.DyeableLeatherItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.trading.MerchantOffer;
 
 public class SellDyedArmorAdapter extends TradeJsonAdapter {
 
     @Override
-    public @NotNull TradeOffers.Factory deserialize(JsonObject json) {
+    public @NotNull VillagerTrades.ItemListing deserialize(JsonObject json) {
 
         loadDefaultStats(json, true);
 
@@ -33,7 +33,7 @@ public class SellDyedArmorAdapter extends TradeJsonAdapter {
         return new Factory(item, price, max_uses, villager_experience, price_multiplier);
     }
 
-    private static class Factory implements TradeOffers.Factory {
+    private static class Factory implements VillagerTrades.ItemListing {
         private final Item sell;
         private final int price;
         private final int maxUses;
@@ -48,9 +48,9 @@ public class SellDyedArmorAdapter extends TradeJsonAdapter {
             this.priceMultiplier = priceMultiplier;
         }
 
-        public TradeOffer create(Entity entity, Random random) {
+        public MerchantOffer getOffer(Entity entity, RandomSource random) {
             ItemStack itemStack2 = new ItemStack(this.sell);
-            if (this.sell instanceof DyeableItem) {
+            if (this.sell instanceof DyeableLeatherItem) {
                 List<DyeItem> list = Lists.newArrayList();
                 list.add(getDye(random));
                 if (random.nextFloat() > 0.7F) {
@@ -61,14 +61,14 @@ public class SellDyedArmorAdapter extends TradeJsonAdapter {
                     list.add(getDye(random));
                 }
 
-                itemStack2 = DyeableItem.blendAndSetColor(itemStack2, list);
+                itemStack2 = DyeableLeatherItem.dyeArmor(itemStack2, list);
             }
 
-            return new TradeOffer(CurrencyHelper.getClosest(price), itemStack2, this.maxUses, this.experience, priceMultiplier);
+            return new MerchantOffer(CurrencyHelper.getClosest(price), itemStack2, this.maxUses, this.experience, priceMultiplier);
 
         }
 
-        private static DyeItem getDye(Random random) {
+        private static DyeItem getDye(RandomSource random) {
             return DyeItem.byColor(DyeColor.byId(random.nextInt(16)));
         }
     }

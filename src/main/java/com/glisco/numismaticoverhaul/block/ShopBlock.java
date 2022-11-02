@@ -3,109 +3,114 @@ package com.glisco.numismaticoverhaul.block;
 import com.glisco.numismaticoverhaul.NumismaticOverhaul;
 import com.glisco.numismaticoverhaul.currency.CurrencyConverter;
 import com.glisco.numismaticoverhaul.network.UpdateShopScreenS2CPacket;
-import net.fabricmc.fabric.api.object.builder.v1.block.FabricBlockSettings;
-import net.minecraft.block.*;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.BlockEntityTicker;
-import net.minecraft.block.entity.BlockEntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.ItemScatterer;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.shape.VoxelShape;
-import net.minecraft.util.shape.VoxelShapes;
-import net.minecraft.world.BlockView;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.Containers;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.BaseEntityBlock;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.Material;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 
-public class ShopBlock extends BlockWithEntity {
+public class ShopBlock extends BaseEntityBlock {
 
-    private static final VoxelShape MAIN_PILLAR = Block.createCuboidShape(1, 0, 1, 14, 8, 14);
+    private static final VoxelShape MAIN_PILLAR = Block.box(1, 0, 1, 14, 8, 14);
 
-    private static final VoxelShape PLATE = Block.createCuboidShape(0, 8, 0, 16, 12, 16);
+    private static final VoxelShape PLATE = Block.box(0, 8, 0, 16, 12, 16);
 
-    private static final VoxelShape PILLAR_1 = Block.createCuboidShape(13, 0, 0, 16, 8, 3);
-    private static final VoxelShape PILLAR_2 = Block.createCuboidShape(0, 0, 0, 3, 8, 3);
-    private static final VoxelShape PILLAR_3 = Block.createCuboidShape(0, 0, 13, 3, 8, 16);
-    private static final VoxelShape PILLAR_4 = Block.createCuboidShape(13, 0, 13, 16, 8, 16);
+    private static final VoxelShape PILLAR_1 = Block.box(13, 0, 0, 16, 8, 3);
+    private static final VoxelShape PILLAR_2 = Block.box(0, 0, 0, 3, 8, 3);
+    private static final VoxelShape PILLAR_3 = Block.box(0, 0, 13, 3, 8, 16);
+    private static final VoxelShape PILLAR_4 = Block.box(13, 0, 13, 16, 8, 16);
 
-    private static final VoxelShape SHAPE = VoxelShapes.union(MAIN_PILLAR, PLATE, PILLAR_1, PILLAR_2, PILLAR_3, PILLAR_4);
+    private static final VoxelShape SHAPE = Shapes.or(MAIN_PILLAR, PLATE, PILLAR_1, PILLAR_2, PILLAR_3, PILLAR_4);
 
     private final boolean inexhaustible;
 
     public ShopBlock(boolean inexhaustible) {
-        super(FabricBlockSettings.of(Material.STONE).nonOpaque().hardness(5.0f));
+        super(BlockBehaviour.Properties.of(Material.STONE).noOcclusion().destroyTime(5.0f));
         this.inexhaustible = inexhaustible;
     }
 
     @Override
-    public BlockRenderType getRenderType(BlockState state) {
-        return BlockRenderType.MODEL;
+    public RenderShape getRenderShape(BlockState state) {
+        return RenderShape.MODEL;
     }
 
     @Override
-    public VoxelShape getOutlineShape(BlockState state, BlockView world, BlockPos pos, ShapeContext context) {
+    public VoxelShape getShape(BlockState state, BlockGetter world, BlockPos pos, CollisionContext context) {
         return SHAPE;
     }
 
     @Override
-    public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand, BlockHitResult hit) {
-        if (!world.isClient) {
+    public InteractionResult use(BlockState state, Level world, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
+        if (!world.isClientSide) {
 
             ShopBlockEntity shop = (ShopBlockEntity) world.getBlockEntity(pos);
 
-            if (shop.getOwner().equals(player.getUuid())) {
-                if (player.isSneaking()) {
+            if (shop.getOwner().equals(player.getUUID())) {
+                if (player.isShiftKeyDown()) {
                     return openShopMerchant(player, shop);
                 } else {
-                    player.openHandledScreen(state.createScreenHandlerFactory(world, pos));
-                    NumismaticOverhaul.CHANNEL.serverHandle(player).send(new UpdateShopScreenS2CPacket(shop));
+                    player.openMenu(state.getMenuProvider(world, pos));
+                    NumismaticOverhaul.CHANNEL.sendTo(new UpdateShopScreenS2CPacket(shop), (ServerPlayer) player);
                 }
             } else {
                 return openShopMerchant(player, shop);
             }
         }
-        return ActionResult.SUCCESS;
+        return InteractionResult.SUCCESS;
     }
 
-    private ActionResult openShopMerchant(PlayerEntity player, ShopBlockEntity shop) {
-        if (shop.getMerchant().getCustomer() != null) return ActionResult.SUCCESS;
+    private InteractionResult openShopMerchant(Player player, ShopBlockEntity shop) {
+        if (shop.getMerchant().getTradingPlayer() != null) return InteractionResult.SUCCESS;
 
         ((ShopMerchant) shop.getMerchant()).updateTrades();
-        shop.getMerchant().setCustomer(player);
-        shop.getMerchant().sendOffers(player, Text.translatable("gui.numismatic-overhaul.shop.merchant_title"), 0);
+        shop.getMerchant().setTradingPlayer(player);
+        shop.getMerchant().openTradingScreen(player, Component.translatable("gui.numismatic-overhaul.shop.merchant_title"), 0);
 
-        return ActionResult.SUCCESS;
+        return InteractionResult.SUCCESS;
     }
 
     @Override
-    public void onPlaced(World world, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack itemStack) {
-        if (world.isClient) return;
+    public void setPlacedBy(Level world, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack itemStack) {
+        if (world.isClientSide) return;
 
-        if (!(placer instanceof ServerPlayerEntity)) {
-            world.breakBlock(pos, true);
+        if (!(placer instanceof ServerPlayer)) {
+            world.destroyBlock(pos, true);
             return;
         }
 
-        ((ShopBlockEntity) world.getBlockEntity(pos)).setOwner(placer.getUuid());
+        ((ShopBlockEntity) world.getBlockEntity(pos)).setOwner(placer.getUUID());
     }
 
     @Override
-    public void onStateReplaced(BlockState state, World world, BlockPos pos, BlockState newState, boolean moved) {
+    public void onRemove(BlockState state, Level world, BlockPos pos, BlockState newState, boolean moved) {
         if (state.getBlock() != newState.getBlock()) {
             if (world.getBlockEntity(pos) instanceof ShopBlockEntity shop) {
                 CurrencyConverter.getAsValidStacks(shop.getStoredCurrency())
-                        .forEach(stack -> ItemScatterer.spawn(shop.getWorld(), pos.getX(), pos.getY(), pos.getZ(), stack));
+                        .forEach(stack -> Containers.dropItemStack(shop.getLevel(), pos.getX(), pos.getY(), pos.getZ(), stack));
 
-                ItemScatterer.spawn(world, pos, shop);
+                Containers.dropContents(world, pos, shop);
             }
-            super.onStateReplaced(state, world, pos, newState, moved);
+            super.onRemove(state, world, pos, newState, moved);
         }
     }
 
@@ -115,13 +120,13 @@ public class ShopBlock extends BlockWithEntity {
 
     @Nullable
     @Override
-    public BlockEntity createBlockEntity(BlockPos pos, BlockState state) {
+    public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new ShopBlockEntity(pos, state);
     }
 
     @Nullable
     @Override
-    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(World world, BlockState state, BlockEntityType<T> type) {
-        return checkType(type, NumismaticOverhaulBlocks.Entities.SHOP, ShopBlockEntity::tick);
+    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level world, BlockState state, BlockEntityType<T> type) {
+        return createTickerHelper(type, NumismaticOverhaulBlocks.SHOP_BLOCK_ENTITY_TYPE.get(), ShopBlockEntity::tick);
     }
 }

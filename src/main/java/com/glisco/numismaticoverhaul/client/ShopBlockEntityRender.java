@@ -1,47 +1,47 @@
 package com.glisco.numismaticoverhaul.client;
 
 import com.glisco.numismaticoverhaul.block.ShopBlockEntity;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.OverlayTexture;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.WorldRenderer;
-import net.minecraft.client.render.block.entity.BlockEntityRenderer;
-import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
-import net.minecraft.client.render.model.json.ModelTransformation;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.Vec3f;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Vector3f;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.block.model.ItemTransforms;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemStack;
 
 public class ShopBlockEntityRender implements BlockEntityRenderer<ShopBlockEntity> {
 
-    public ShopBlockEntityRender(BlockEntityRendererFactory.Context context) {
+    public ShopBlockEntityRender(BlockEntityRendererProvider.Context context) {
         super();
     }
 
     @Override
-    public void render(ShopBlockEntity entity, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light, int overlay) {
+    public void render(ShopBlockEntity entity, float tickDelta, PoseStack matrices, MultiBufferSource vertexConsumers, int light, int overlay) {
 
-        var client = MinecraftClient.getInstance();
+        var client = Minecraft.getInstance();
 
         if (entity.getOffers().isEmpty()) return;
 
         ItemStack toRender = entity.getItemToRender();
         boolean isBlockItem = toRender.getItem() instanceof BlockItem;
 
-        int lightAbove = WorldRenderer.getLightmapCoordinates(entity.getWorld(), entity.getPos().up());
+        int lightAbove = LevelRenderer.getLightColor(entity.getLevel(), entity.getBlockPos().above());
 
-        matrices.push();
+        matrices.pushPose();
         matrices.translate(0.5, isBlockItem ? 0.85 : 0.95, 0.5);
 
         float scale = isBlockItem ? 0.95f : 0.85f;
         matrices.scale(scale, scale, scale);
 
-        matrices.multiply(Vec3f.POSITIVE_Y.getDegreesQuaternion((float) (System.currentTimeMillis() / 20d % 360d)));
+        matrices.mulPose(Vector3f.YP.rotationDegrees((float) (System.currentTimeMillis() / 20d % 360d)));
 
-        client.getItemRenderer().renderItem(toRender, ModelTransformation.Mode.GROUND, lightAbove, OverlayTexture.DEFAULT_UV, matrices, vertexConsumers, 0);
+        client.getItemRenderer().renderStatic(toRender, ItemTransforms.TransformType.GROUND, lightAbove, OverlayTexture.NO_OVERLAY, matrices, vertexConsumers, 0);
 
-        matrices.pop();
+        matrices.popPose();
 
     }
 }

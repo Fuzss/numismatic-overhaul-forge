@@ -3,9 +3,6 @@ package com.glisco.numismaticoverhaul.mixin;
 import com.glisco.numismaticoverhaul.currency.CurrencyHelper;
 import com.glisco.numismaticoverhaul.item.CurrencyItem;
 import com.glisco.numismaticoverhaul.villagers.data.NumismaticTradeOfferExtensions;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.village.TradeOffer;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -16,13 +13,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
 
 import java.util.Collections;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.trading.MerchantOffer;
 
-@Mixin(TradeOffer.class)
+@Mixin(MerchantOffer.class)
 public class TradeOfferMixin implements NumismaticTradeOfferExtensions {
 
     @Shadow
     @Final
-    private ItemStack firstBuyItem;
+    private ItemStack baseCostA;
     private int numismatic$reputation = 0;
 
     @Override
@@ -35,23 +35,23 @@ public class TradeOfferMixin implements NumismaticTradeOfferExtensions {
         return numismatic$reputation;
     }
 
-    @Inject(method = "toNbt", at = @At("RETURN"), locals = LocalCapture.CAPTURE_FAILHARD)
-    private void saveReputation(CallbackInfoReturnable<NbtCompound> cir, NbtCompound nbt) {
+    @Inject(method = "createTag", at = @At("RETURN"), locals = LocalCapture.CAPTURE_FAILHARD)
+    private void saveReputation(CallbackInfoReturnable<CompoundTag> cir, CompoundTag nbt) {
         nbt.putInt("Reputation", numismatic$reputation);
     }
 
-    @Inject(method = "<init>(Lnet/minecraft/nbt/NbtCompound;)V", at = @At("RETURN"))
-    private void loadReputation(NbtCompound nbt, CallbackInfo ci) {
+    @Inject(method = "<init>(Lnet/minecraft/nbt/CompoundTag;)V", at = @At("RETURN"))
+    private void loadReputation(CompoundTag nbt, CallbackInfo ci) {
         this.numismatic$reputation = nbt.getInt("Reputation");
     }
 
-    @Inject(method = "getAdjustedFirstBuyItem", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "getCostA", at = @At("HEAD"), cancellable = true)
     private void adjustFirstStack(CallbackInfoReturnable<ItemStack> cir) {
         if (this.numismatic$reputation == -69420) return;
 
-        if (!(this.firstBuyItem.getItem() instanceof CurrencyItem currencyItem)) return;
+        if (!(this.baseCostA.getItem() instanceof CurrencyItem currencyItem)) return;
 
-        long originalValue = currencyItem.getValue(this.firstBuyItem);
+        long originalValue = currencyItem.getValue(this.baseCostA);
         long adjustedValue = numismatic$reputation < 0
                 ? (long) (originalValue + Math.abs(numismatic$reputation) * (Math.abs(originalValue) * .02))
                 : (long) Math.max(1, originalValue - Math.abs(originalValue) * (numismatic$reputation / (numismatic$reputation + 100f)));
@@ -59,7 +59,7 @@ public class TradeOfferMixin implements NumismaticTradeOfferExtensions {
         adjustedValue = Math.min(adjustedValue, 990000);
 
         final var roundedStack = CurrencyHelper.getClosest(adjustedValue);
-        if (originalValue != CurrencyHelper.getValue(Collections.singletonList(roundedStack)) && !roundedStack.isOf(this.firstBuyItem.getItem())) {
+        if (originalValue != CurrencyHelper.getValue(Collections.singletonList(roundedStack)) && !roundedStack.is(this.baseCostA.getItem())) {
             CurrencyItem.setOriginalValue(roundedStack, originalValue);
         }
         cir.setReturnValue(roundedStack);

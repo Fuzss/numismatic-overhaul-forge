@@ -3,14 +3,13 @@ package com.glisco.numismaticoverhaul.block;
 import com.glisco.numismaticoverhaul.currency.CurrencyConverter;
 import com.glisco.numismaticoverhaul.item.MoneyBagItem;
 import com.glisco.numismaticoverhaul.villagers.data.NumismaticTradeOfferExtensions;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.util.collection.DefaultedList;
-import net.minecraft.village.TradeOffer;
-
 import java.util.List;
+import net.minecraft.core.NonNullList;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.trading.MerchantOffer;
 
 public class ShopOffer {
 
@@ -27,11 +26,11 @@ public class ShopOffer {
     }
 
     @SuppressWarnings("ConstantConditions")
-    public TradeOffer toTradeOffer(ShopBlockEntity shop, boolean inexhaustible) {
+    public MerchantOffer toTradeOffer(ShopBlockEntity shop, boolean inexhaustible) {
         var buy = CurrencyConverter.getRequiredCurrencyTypes(price) == 1 ? CurrencyConverter.getAsItemStackList(price).get(0) : MoneyBagItem.create(price);
         int maxUses = inexhaustible ? Integer.MAX_VALUE : count(shop.getItems(), sell) / sell.getCount();
 
-        final var tradeOffer = new TradeOffer(buy, sell, maxUses, 0, 0);
+        final var tradeOffer = new MerchantOffer(buy, sell, maxUses, 0, 0);
         ((NumismaticTradeOfferExtensions) tradeOffer).numismatic$setReputation(-69420);
         return tradeOffer;
     }
@@ -44,9 +43,9 @@ public class ShopOffer {
         return sell.copy();
     }
 
-    public static NbtCompound writeAll(NbtCompound tag, List<ShopOffer> offers) {
+    public static CompoundTag writeAll(CompoundTag tag, List<ShopOffer> offers) {
 
-        NbtList offerList = new NbtList();
+        ListTag offerList = new ListTag();
 
         for (ShopOffer offer : offers) {
             offerList.add(offer.toNbt());
@@ -57,48 +56,48 @@ public class ShopOffer {
         return tag;
     }
 
-    public static void readAll(NbtCompound tag, List<ShopOffer> offers) {
+    public static void readAll(CompoundTag tag, List<ShopOffer> offers) {
         offers.clear();
 
-        NbtList offerList = tag.getList("Offers", NbtElement.COMPOUND_TYPE);
+        ListTag offerList = tag.getList("Offers", Tag.TAG_COMPOUND);
 
-        for (NbtElement offerTag : offerList) {
-            offers.add(fromNbt((NbtCompound) offerTag));
+        for (Tag offerTag : offerList) {
+            offers.add(fromNbt((CompoundTag) offerTag));
         }
     }
 
-    public NbtCompound toNbt() {
-        var nbt = new NbtCompound();
+    public CompoundTag toNbt() {
+        var nbt = new CompoundTag();
         nbt.putLong("Price", this.price);
 
-        var itemNbt = new NbtCompound();
-        this.sell.writeNbt(itemNbt);
+        var itemNbt = new CompoundTag();
+        this.sell.save(itemNbt);
 
         nbt.put("Item", itemNbt);
         return nbt;
     }
 
-    public static ShopOffer fromNbt(NbtCompound nbt) {
-        var item = ItemStack.fromNbt(nbt.getCompound("Item"));
+    public static ShopOffer fromNbt(CompoundTag nbt) {
+        var item = ItemStack.of(nbt.getCompound("Item"));
         return new ShopOffer(item, nbt.getLong("Price"));
     }
 
-    public static int count(DefaultedList<ItemStack> stacks, ItemStack testStack) {
+    public static int count(NonNullList<ItemStack> stacks, ItemStack testStack) {
         int count = 0;
         for (var stack : stacks) {
-            if (!ItemStack.canCombine(stack, testStack)) continue;
+            if (!ItemStack.isSameItemSameTags(stack, testStack)) continue;
             count += stack.getCount();
         }
         return count;
     }
 
-    public static int remove(DefaultedList<ItemStack> stacks, ItemStack removeStack) {
+    public static int remove(NonNullList<ItemStack> stacks, ItemStack removeStack) {
         int toRemove = removeStack.getCount();
         for (var stack : stacks) {
-            if (!ItemStack.canCombine(stack, removeStack)) continue;
+            if (!ItemStack.isSameItemSameTags(stack, removeStack)) continue;
 
             int removed = stack.getCount();
-            stack.decrement(toRemove);
+            stack.shrink(toRemove);
 
             toRemove -= removed;
             if (toRemove < 1) break;

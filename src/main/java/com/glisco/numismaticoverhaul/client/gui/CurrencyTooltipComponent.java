@@ -3,28 +3,27 @@ package com.glisco.numismaticoverhaul.client.gui;
 import com.glisco.numismaticoverhaul.currency.CurrencyConverter;
 import com.glisco.numismaticoverhaul.item.CurrencyTooltipData;
 import com.mojang.blaze3d.systems.RenderSystem;
-import io.wispforest.owo.ops.ItemOps;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawableHelper;
-import net.minecraft.client.gui.tooltip.TooltipComponent;
-import net.minecraft.client.render.LightmapTextureManager;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.item.ItemRenderer;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.item.ItemStack;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.Matrix4f;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Matrix4f;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiComponent;
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
+import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.entity.ItemRenderer;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-public class CurrencyTooltipComponent implements TooltipComponent {
+public class CurrencyTooltipComponent implements ClientTooltipComponent {
 
     private final CurrencyTooltipData data;
-    private final List<Text> text;
+    private final List<Component> text;
 
     private int widthCache = -1;
 
@@ -34,7 +33,7 @@ public class CurrencyTooltipComponent implements TooltipComponent {
 
         if (data.original()[0] != -1) {
             CurrencyConverter.getAsItemStackList(data.original()).forEach(stack -> text.add(createPlaceholder(stack.getCount())));
-            text.add(Text.of(" "));
+            text.add(Component.nullToEmpty(" "));
         }
 
         CurrencyConverter.getAsItemStackList(data.value()).forEach(stack -> text.add(createPlaceholder(stack.getCount())));
@@ -46,40 +45,45 @@ public class CurrencyTooltipComponent implements TooltipComponent {
     }
 
     @Override
-    public int getWidth(TextRenderer textRenderer) {
+    public int getWidth(Font textRenderer) {
         if (widthCache == -1) {
-            widthCache = textRenderer.getWidth(text.stream()
-                    .max(Comparator.comparingInt(textRenderer::getWidth)).orElse(Text.of("")));
+            widthCache = textRenderer.width(text.stream()
+                    .max(Comparator.comparingInt(textRenderer::width)).orElse(Component.nullToEmpty("")));
         }
         return widthCache;
     }
 
     @Override
-    public void drawText(TextRenderer textRenderer, int x, int y, Matrix4f matrix4f, VertexConsumerProvider.Immediate immediate) {
+    public void renderText(Font textRenderer, int x, int y, Matrix4f matrix4f, MultiBufferSource.BufferSource immediate) {
         for (int i = 0; i < text.size(); i++) {
-            textRenderer.draw(text.get(i), x, y + i * 10, -1, true, matrix4f, immediate, false, 0, LightmapTextureManager.MAX_LIGHT_COORDINATE);
+            textRenderer.drawInBatch(text.get(i), x, y + i * 10, -1, true, matrix4f, immediate, false, 0, LightTexture.FULL_BRIGHT);
         }
     }
 
     @Override
-    public void drawItems(TextRenderer textRenderer, int x, int y, MatrixStack matrices, ItemRenderer itemRenderer, int z) {
+    public void renderImage(Font textRenderer, int x, int y, PoseStack matrices, ItemRenderer itemRenderer, int z) {
         List<ItemStack> originalCoins = data.original()[0] != -1 ? CurrencyConverter.getAsItemStackList(data.original()) : new ArrayList<>();
         List<ItemStack> coins = CurrencyConverter.getAsItemStackList(data.value());
 
-        RenderSystem.setShaderTexture(0, new Identifier("textures/gui/container/villager2.png"));
+        RenderSystem.setShaderTexture(0, new ResourceLocation("textures/gui/container/villager2.png"));
         for (int i = 0; i < originalCoins.size(); i++) {
-            DrawableHelper.drawTexture(matrices, x + (originalCoins.get(i).getCount() > 9 ? 14 : 11), y + 3, z, 0, 176, 9, 2, 512, 256);
-            itemRenderer.renderGuiItemIcon(ItemOps.singleCopy(originalCoins.get(i)), x - 4, y - 5 + i * 10);
+            GuiComponent.blit(matrices, x + (originalCoins.get(i).getCount() > 9 ? 14 : 11), y + 3, z, 0, 176, 9, 2, 512, 256);
+            itemRenderer.renderGuiItem(singleCopy(originalCoins.get(i)), x - 4, y - 5 + i * 10);
         }
 
         for (int i = 0; i < coins.size(); i++) {
-            itemRenderer.renderGuiItemIcon(ItemOps.singleCopy(coins.get(i)), x - 4, y - 5 + i * 10 + (originalCoins.size() == 0 ? 0 : 10 + originalCoins.size() * 10));
+            itemRenderer.renderGuiItem(singleCopy(coins.get(i)), x - 4, y - 5 + i * 10 + (originalCoins.size() == 0 ? 0 : 10 + originalCoins.size() * 10));
         }
     }
 
-    private static Text createPlaceholder(int count) {
+    private static Component createPlaceholder(int count) {
         String placeholder = "§7   " + count + " ";
-        return Text.literal(placeholder).formatted(Formatting.GRAY);
+        return Component.literal(placeholder).withStyle(ChatFormatting.GRAY);
     }
 
+    public static ItemStack singleCopy(ItemStack stack) {
+        ItemStack copy = stack.copy();
+        copy.setCount(1);
+        return copy;
+    }
 }

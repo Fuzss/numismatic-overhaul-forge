@@ -2,36 +2,37 @@ package com.glisco.numismaticoverhaul.currency;
 
 import com.glisco.numismaticoverhaul.ModComponents;
 import com.glisco.numismaticoverhaul.item.CoinItem;
-import dev.onyxstudios.cca.api.v3.component.Component;
-import dev.onyxstudios.cca.api.v3.component.sync.AutoSyncedComponent;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
+import fuzs.puzzleslib.capability.data.CapabilityComponent;
+import fuzs.puzzleslib.capability.data.SyncedCapabilityComponent;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class CurrencyComponent implements Component, AutoSyncedComponent {
+public class CurrencyComponent implements SyncedCapabilityComponent {
 
+    private boolean dirty;
     private long value;
-    private final PlayerEntity provider;
+    private final Player provider;
 
     private final List<Long> transactions;
 
-    public CurrencyComponent(PlayerEntity provider) {
+    public CurrencyComponent(Player provider) {
         this.provider = provider;
         this.transactions = new ArrayList<Long>();
     }
 
     @Override
-    public void readFromNbt(NbtCompound tag) {
+    public void read(CompoundTag tag) {
         value = tag.getLong("Value");
     }
 
     @Override
-    public void writeToNbt(NbtCompound tag) {
+    public void write(CompoundTag tag) {
         tag.putLong("Value", value);
     }
 
@@ -46,11 +47,12 @@ public class CurrencyComponent implements Component, AutoSyncedComponent {
      */
     @Deprecated
     public void setValue(long value) {
+        this.markDirty();
         this.value = value;
 
         //Update Client
-        if (!provider.world.isClient) {
-            ModComponents.CURRENCY.sync(this.provider);
+        if (!provider.level.isClientSide) {
+            ModComponents.CURRENCY.syncToRemote((ServerPlayer) this.provider);
         }
     }
 
@@ -67,16 +69,16 @@ public class CurrencyComponent implements Component, AutoSyncedComponent {
         List<ItemStack> transactionStacks = CurrencyConverter.getAsItemStackList(tempValue);
         if (transactionStacks.isEmpty()) return;
 
-        MutableText message = value < 0 ? Text.literal("§c- ") : Text.literal("§a+ ");
-        message.append(Text.literal("§7["));
+        MutableComponent message = value < 0 ? net.minecraft.network.chat.Component.literal("§c- ") : net.minecraft.network.chat.Component.literal("§a+ ");
+        message.append(net.minecraft.network.chat.Component.literal("§7["));
         for (ItemStack stack : transactionStacks) {
-            message.append(Text.literal("§b" + stack.getCount() + " "));
-            message.append(Text.translatable("currency.numismatic-overhaul." + ((CoinItem) stack.getItem()).currency.name().toLowerCase()));
-            if (transactionStacks.indexOf(stack) != transactionStacks.size() - 1) message.append(Text.literal(", "));
+            message.append(net.minecraft.network.chat.Component.literal("§b" + stack.getCount() + " "));
+            message.append(net.minecraft.network.chat.Component.translatable("currency.numismaticoverhaul." + ((CoinItem) stack.getItem()).currency.name().toLowerCase()));
+            if (transactionStacks.indexOf(stack) != transactionStacks.size() - 1) message.append(net.minecraft.network.chat.Component.literal(", "));
         }
-        message.append(Text.literal("§7]"));
+        message.append(net.minecraft.network.chat.Component.literal("§7]"));
 
-        provider.sendMessage(message, true);
+        provider.displayClientMessage(message, true);
     }
 
     /**
@@ -114,5 +116,20 @@ public class CurrencyComponent implements Component, AutoSyncedComponent {
     public void commitTransactions() {
         this.modify(this.transactions.stream().mapToLong(Long::longValue).sum());
         this.transactions.clear();
+    }
+
+    @Override
+    public boolean isDirty() {
+        return this.dirty;
+    }
+
+    @Override
+    public void markDirty() {
+        this.dirty = true;
+    }
+
+    @Override
+    public void markClean() {
+        this.dirty = false;
     }
 }

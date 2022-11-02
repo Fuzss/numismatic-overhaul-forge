@@ -2,7 +2,7 @@ package com.glisco.numismaticoverhaul.villagers.json;
 
 import com.glisco.numismaticoverhaul.villagers.exceptions.DeserializationException;
 import com.google.gson.JsonObject;
-import net.minecraft.village.TradeOffers;
+import net.minecraft.world.entity.npc.VillagerTrades;
 import org.jetbrains.annotations.NotNull;
 
 public abstract class TradeJsonAdapter {
@@ -12,7 +12,7 @@ public abstract class TradeJsonAdapter {
     protected float price_multiplier;
 
     @NotNull
-    public abstract TradeOffers.Factory deserialize(JsonObject json);
+    public abstract VillagerTrades.ItemListing deserialize(JsonObject json);
 
     protected void loadDefaultStats(JsonObject jsonObject, boolean verifyPrice) {
 

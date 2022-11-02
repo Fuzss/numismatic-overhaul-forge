@@ -1,25 +1,25 @@
 package com.glisco.numismaticoverhaul.block;
 
 import com.glisco.numismaticoverhaul.currency.CurrencyHelper;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.network.packet.s2c.play.SetTradeOffersS2CPacket;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.village.Merchant;
-import net.minecraft.village.TradeOffer;
-import net.minecraft.village.TradeOfferList;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
+import net.minecraft.network.protocol.game.ClientboundMerchantOffersPacket;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.trading.Merchant;
+import net.minecraft.world.item.trading.MerchantOffer;
+import net.minecraft.world.item.trading.MerchantOffers;
 
 public class ShopMerchant implements Merchant {
 
     private final ShopBlockEntity shop;
     private final boolean inexhaustible;
-    private TradeOfferList recipeList = new TradeOfferList();
-    private PlayerEntity customer;
+    private MerchantOffers recipeList = new MerchantOffers();
+    private Player customer;
 
     public ShopMerchant(ShopBlockEntity blockEntity, boolean inexhaustible) {
         this.shop = blockEntity;
@@ -32,72 +32,72 @@ public class ShopMerchant implements Merchant {
     }
 
     @Override
-    public void setCustomer(@Nullable PlayerEntity customer) {
+    public void setTradingPlayer(@Nullable Player customer) {
         this.customer = customer;
     }
 
     @Nullable
     @Override
-    public PlayerEntity getCustomer() {
+    public Player getTradingPlayer() {
         return customer;
     }
 
     @Override
-    public TradeOfferList getOffers() {
+    public MerchantOffers getOffers() {
         return recipeList;
     }
 
     @Override
-    public void setOffersFromServer(@Nullable TradeOfferList offers) {
+    public void overrideOffers(@Nullable MerchantOffers offers) {
         this.recipeList = offers;
     }
 
     @Override
-    public void trade(TradeOffer offer) {
-        offer.use();
+    public void notifyTrade(MerchantOffer offer) {
+        offer.increaseUses();
         if (!this.inexhaustible) {
-            ShopOffer.remove(shop.getItems(), offer.getSellItem());
+            ShopOffer.remove(shop.getItems(), offer.getResult());
 
             this.updateTrades();
-            if (this.getCustomer() instanceof ServerPlayerEntity serverPlayer) {
-                serverPlayer.networkHandler.sendPacket(new SetTradeOffersS2CPacket(
-                        serverPlayer.currentScreenHandler.syncId,
+            if (this.getTradingPlayer() instanceof ServerPlayer serverPlayer) {
+                serverPlayer.connection.send(new ClientboundMerchantOffersPacket(
+                        serverPlayer.containerMenu.containerId,
                         this.recipeList,
                         0, 0, false, false
                 ));
             }
         }
 
-        shop.addCurrency(CurrencyHelper.getValue(Arrays.asList(offer.getOriginalFirstBuyItem(), offer.getSecondBuyItem())));
+        shop.addCurrency(CurrencyHelper.getValue(Arrays.asList(offer.getBaseCostA(), offer.getCostB())));
     }
 
     @Override
-    public void onSellingItem(ItemStack stack) {
+    public void notifyTradeUpdated(ItemStack stack) {
 
     }
 
     @Override
-    public int getExperience() {
+    public int getVillagerXp() {
         return 0;
     }
 
     @Override
-    public void setExperienceFromServer(int experience) {
+    public void overrideXp(int experience) {
 
     }
 
     @Override
-    public boolean isLeveledMerchant() {
+    public boolean showProgressBar() {
         return false;
     }
 
     @Override
-    public SoundEvent getYesSound() {
-        return SoundEvents.ENTITY_VILLAGER_YES;
+    public SoundEvent getNotifyTradeSound() {
+        return SoundEvents.VILLAGER_YES;
     }
 
     @Override
-    public boolean isClient() {
+    public boolean isClientSide() {
         return false;
     }
 }

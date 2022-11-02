@@ -2,17 +2,18 @@ package com.glisco.numismaticoverhaul.mixin;
 
 import com.glisco.numismaticoverhaul.ModComponents;
 import com.glisco.numismaticoverhaul.NumismaticOverhaul;
+import com.glisco.numismaticoverhaul.NumismaticOverhaulConfigModel;
 import com.glisco.numismaticoverhaul.client.gui.purse.PurseButton;
 import com.glisco.numismaticoverhaul.client.gui.purse.PurseWidget;
 import com.glisco.numismaticoverhaul.network.RequestPurseActionC2SPacket;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.ingame.AbstractInventoryScreen;
-import net.minecraft.client.gui.screen.ingame.InventoryScreen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.screen.PlayerScreenHandler;
-import net.minecraft.text.Text;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.EffectRenderingInventoryScreen;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.InventoryMenu;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -20,8 +21,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(InventoryScreen.class)
-public abstract class InventoryScreenMixin extends AbstractInventoryScreen<PlayerScreenHandler> {
-    public InventoryScreenMixin(PlayerScreenHandler screenHandler, PlayerInventory playerInventory, Text text) {
+public abstract class InventoryScreenMixin extends EffectRenderingInventoryScreen<InventoryMenu> {
+    public InventoryScreenMixin(InventoryMenu screenHandler, Inventory playerInventory, Component text) {
         super(screenHandler, playerInventory, text);
     }
 
@@ -33,31 +34,31 @@ public abstract class InventoryScreenMixin extends AbstractInventoryScreen<Playe
 
     @Inject(method = "init", at = @At("TAIL"))
     public void addButton(CallbackInfo ci) {
-        int purseX = NumismaticOverhaul.CONFIG.pursePositionX();
-        int purseY = NumismaticOverhaul.CONFIG.pursePositionY();
+        int purseX = NumismaticOverhaul.CONFIG.get(NumismaticOverhaulConfigModel.class).pursePositionX;
+        int purseY = NumismaticOverhaul.CONFIG.get(NumismaticOverhaulConfigModel.class).pursePositionY;
 
-        numismatic$purse = new PurseWidget(this.x + purseX, this.y + purseY, client, ModComponents.CURRENCY.get(client.player));
+        numismatic$purse = new PurseWidget(this.leftPos + purseX, this.topPos + purseY, minecraft, ModComponents.CURRENCY.get(minecraft.player));
 
-        numismatic$button = new PurseButton(this.x + purseX + 29, this.y + purseY - 14, button -> {
+        numismatic$button = new PurseButton(this.leftPos + purseX + 29, this.topPos + purseY - 14, button -> {
             if (Screen.hasShiftDown()) {
-                NumismaticOverhaul.CHANNEL.clientHandle().send(RequestPurseActionC2SPacket.storeAll());
+                NumismaticOverhaul.CHANNEL.sendToServer(RequestPurseActionC2SPacket.storeAll());
             } else {
                 numismatic$purse.toggleActive();
             }
-        }, client.player, this);
+        }, minecraft.player, this);
 
-        this.addDrawableChild(numismatic$button);
+        this.addRenderableWidget(numismatic$button);
     }
 
     //Incredibly beautiful lambda mixin
-    @Inject(method = "method_19891", at = @At("TAIL"))
-    private void updateWidgetPosition(ButtonWidget button, CallbackInfo ci) {
-        this.numismatic$button.setPos(this.x + 158, this.y + 6);
-        this.numismatic$purse = new PurseWidget(this.x + 129, this.y + 20, client, ModComponents.CURRENCY.get(client.player));
+    @Inject(method = "lambda$init$0(Lnet/minecraft/client/gui/components/Button;)V", at = @At("TAIL"))
+    private void updateWidgetPosition(Button button, CallbackInfo ci) {
+        this.numismatic$button.setPosition(this.leftPos + 158, this.topPos + 6);
+        this.numismatic$purse = new PurseWidget(this.leftPos + 129, this.topPos + 20, minecraft, ModComponents.CURRENCY.get(minecraft.player));
     }
 
     @Inject(method = "render", at = @At("TAIL"))
-    public void onRender(MatrixStack matrices, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+    public void onRender(PoseStack matrices, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         numismatic$purse.render(matrices, mouseX, mouseY, delta);
     }
 
@@ -67,9 +68,9 @@ public abstract class InventoryScreenMixin extends AbstractInventoryScreen<Playe
     }
 
     @Override
-    protected void drawMouseoverTooltip(MatrixStack matrices, int x, int y) {
+    protected void renderTooltip(PoseStack matrices, int x, int y) {
         if (numismatic$purse.isMouseOver(x, y)) return;
-        super.drawMouseoverTooltip(matrices, x, y);
+        super.renderTooltip(matrices, x, y);
     }
 
 }

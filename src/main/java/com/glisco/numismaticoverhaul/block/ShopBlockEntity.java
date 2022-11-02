@@ -1,29 +1,26 @@
 package com.glisco.numismaticoverhaul.block;
 
 import com.glisco.numismaticoverhaul.NumismaticOverhaul;
-import io.wispforest.owo.ops.WorldOps;
-import io.wispforest.owo.util.ImplementedInventory;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.inventory.Inventories;
-import net.minecraft.inventory.SidedInventory;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.network.Packet;
-import net.minecraft.network.listener.ClientPlayPacketListener;
-import net.minecraft.network.packet.s2c.play.BlockEntityUpdateS2CPacket;
-import net.minecraft.screen.NamedScreenHandlerFactory;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.text.Text;
-import net.minecraft.util.collection.DefaultedList;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.village.Merchant;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.NonNullList;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.ContainerHelper;
+import net.minecraft.world.MenuProvider;
+import net.minecraft.world.WorldlyContainer;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.trading.Merchant;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -32,12 +29,12 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.IntStream;
 
-public class ShopBlockEntity extends BlockEntity implements ImplementedInventory, SidedInventory, NamedScreenHandlerFactory {
+public class ShopBlockEntity extends BlockEntity implements WorldlyContainer, MenuProvider {
 
     private static final int[] SLOTS = IntStream.range(0, 27).toArray();
     private static final int[] NO_SLOTS = new int[0];
 
-    private final DefaultedList<ItemStack> INVENTORY = DefaultedList.ofSize(27, ItemStack.EMPTY);
+    private final NonNullList<ItemStack> INVENTORY = NonNullList.withSize(27, ItemStack.EMPTY);
 
     private final Merchant merchant;
     private final List<ShopOffer> offers;
@@ -49,7 +46,7 @@ public class ShopBlockEntity extends BlockEntity implements ImplementedInventory
     private int tradeIndex;
 
     public ShopBlockEntity(BlockPos pos, BlockState state) {
-        super(NumismaticOverhaulBlocks.Entities.SHOP, pos, state);
+        super(NumismaticOverhaulBlocks.SHOP_BLOCK_ENTITY_TYPE.get(), pos, state);
 
         boolean inexhaustible = (state.getBlock() instanceof ShopBlock shop) && shop.inexhaustible();
         this.merchant = new ShopMerchant(this, inexhaustible);
@@ -58,29 +55,28 @@ public class ShopBlockEntity extends BlockEntity implements ImplementedInventory
         this.storedCurrency = 0;
     }
 
-    @Override
-    public DefaultedList<ItemStack> getItems() {
+    public NonNullList<ItemStack> getItems() {
         return INVENTORY;
     }
 
     @Override
-    public int[] getAvailableSlots(Direction side) {
+    public int[] getSlotsForFace(Direction side) {
         return allowsTransfer ? SLOTS : NO_SLOTS;
     }
 
     @Override
-    public boolean canInsert(int slot, ItemStack stack, @Nullable Direction dir) {
+    public boolean canPlaceItemThroughFace(int slot, ItemStack stack, @Nullable Direction dir) {
         return allowsTransfer;
     }
 
     @Override
-    public boolean canExtract(int slot, ItemStack stack, Direction dir) {
+    public boolean canTakeItemThroughFace(int slot, ItemStack stack, Direction dir) {
         return false;
     }
 
     @Override
-    public Text getDisplayName() {
-        return Text.translatable("gui.numismatic-overhaul.shop.inventory_title");
+    public Component getDisplayName() {
+        return Component.translatable("gui.numismaticoverhaul.shop.inventory_title");
     }
 
     @NotNull
@@ -106,33 +102,33 @@ public class ShopBlockEntity extends BlockEntity implements ImplementedInventory
 
     public void setStoredCurrency(long storedCurrency) {
         this.storedCurrency = storedCurrency;
-        markDirty();
+        setChanged();
     }
 
     public void addCurrency(long value) {
         this.storedCurrency += value;
-        markDirty();
+        setChanged();
     }
 
     @Override
-    public void writeNbt(NbtCompound tag) {
-        super.writeNbt(tag);
-        Inventories.writeNbt(tag, INVENTORY);
+    public void saveAdditional(CompoundTag tag) {
+        super.saveAdditional(tag);
+        ContainerHelper.saveAllItems(tag, INVENTORY);
         ShopOffer.writeAll(tag, offers);
         tag.putBoolean("AllowsTransfer", this.allowsTransfer);
         tag.putLong("StoredCurrency", storedCurrency);
         if (owner != null) {
-            tag.putUuid("Owner", owner);
+            tag.putUUID("Owner", owner);
         }
     }
 
     @Override
-    public void readNbt(NbtCompound tag) {
-        super.readNbt(tag);
-        Inventories.readNbt(tag, INVENTORY);
+    public void load(CompoundTag tag) {
+        super.load(tag);
+        ContainerHelper.loadAllItems(tag, INVENTORY);
         ShopOffer.readAll(tag, offers);
         if (tag.contains("Owner")) {
-            owner = tag.getUuid("Owner");
+            owner = tag.getUUID("Owner");
         }
         this.allowsTransfer = tag.getBoolean("AllowsTransfer");
         this.storedCurrency = tag.getLong("StoredCurrency");
@@ -143,14 +139,14 @@ public class ShopBlockEntity extends BlockEntity implements ImplementedInventory
         int indexToReplace = -1;
 
         for (int i = 0; i < offers.size(); i++) {
-            if (!ItemStack.areEqual(offer.getSellStack(), offers.get(i).getSellStack())) continue;
+            if (!ItemStack.matches(offer.getSellStack(), offers.get(i).getSellStack())) continue;
             indexToReplace = i;
             break;
         }
 
         if (indexToReplace == -1) {
             if (offers.size() >= 24) {
-                NumismaticOverhaul.LOGGER.error("Tried adding more than 24 trades to shop at {}", this.pos);
+                NumismaticOverhaul.LOGGER.error("Tried adding more than 24 trades to shop at {}", this.worldPosition);
                 return;
             }
             offers.add(offer);
@@ -158,27 +154,26 @@ public class ShopBlockEntity extends BlockEntity implements ImplementedInventory
             offers.set(indexToReplace, offer);
         }
 
-        this.markDirty();
+        this.setChanged();
     }
 
     public void deleteOffer(ItemStack stack) {
-        if (!offers.removeIf(offer -> ItemStack.areEqual(stack, offer.getSellStack()))) {
-            NumismaticOverhaul.LOGGER.error("Tried to delete invalid trade for {} from shop at {}", stack, this.pos);
+        if (!offers.removeIf(offer -> ItemStack.matches(stack, offer.getSellStack()))) {
+            NumismaticOverhaul.LOGGER.error("Tried to delete invalid trade for {} from shop at {}", stack, this.worldPosition);
             return;
         }
 
-        this.markDirty();
+        this.setChanged();
     }
 
-    public static void tick(World world, BlockPos pos, BlockState state, ShopBlockEntity blockEntity) {
+    public static void tick(Level world, BlockPos pos, BlockState state, ShopBlockEntity blockEntity) {
         blockEntity.tick();
     }
 
     public void tick() {
-        if (world.getTime() % 60 == 0) tradeIndex++;
+        if (level.getGameTime() % 60 == 0) tradeIndex++;
     }
 
-    @Environment(EnvType.CLIENT)
     public ItemStack getItemToRender() {
         if (tradeIndex > offers.size() - 1) tradeIndex = 0;
         return offers.get(tradeIndex).getSellStack();
@@ -186,19 +181,19 @@ public class ShopBlockEntity extends BlockEntity implements ImplementedInventory
 
     @Nullable
     @Override
-    public ScreenHandler createMenu(int syncId, PlayerInventory inv, PlayerEntity player) {
+    public AbstractContainerMenu createMenu(int syncId, Inventory inv, Player player) {
         return new ShopScreenHandler(syncId, inv, this);
     }
 
     @Override
-    public boolean canPlayerUse(PlayerEntity player) {
-        return player.getUuid().equals(this.owner);
+    public boolean stillValid(Player player) {
+        return player.getUUID().equals(this.owner);
     }
 
     @Override
-    public NbtCompound toInitialChunkDataNbt() {
-        NbtCompound tag = new NbtCompound();
-        this.writeNbt(tag);
+    public CompoundTag getUpdateTag() {
+        CompoundTag tag = new CompoundTag();
+        this.saveAdditional(tag);
         tag.remove("Items");
         tag.remove("StoredCurrency");
         return tag;
@@ -210,18 +205,67 @@ public class ShopBlockEntity extends BlockEntity implements ImplementedInventory
 
     public void setOwner(UUID owner) {
         this.owner = owner;
-        markDirty();
+        setChanged();
     }
 
     @Nullable
     @Override
-    public Packet<ClientPlayPacketListener> toUpdatePacket() {
-        return BlockEntityUpdateS2CPacket.create(this);
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 
     @Override
-    public void markDirty() {
-        super.markDirty();
-        WorldOps.updateIfOnServer(world, pos);
+    public int getContainerSize() {
+        return getItems().size();
+    }
+
+    @Override
+    public boolean isEmpty() {
+        for (int i = 0; i < getContainerSize(); i++) {
+            ItemStack stack = getItem(i);
+            if (!stack.isEmpty()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public ItemStack getItem(int p_18941_) {
+        return getItems().get(p_18941_);
+    }
+
+    @Override
+    public ItemStack removeItem(int slot, int count) {
+        ItemStack result = ContainerHelper.removeItem(getItems(), slot, count);
+        if (!result.isEmpty()) {
+            setChanged();
+        }
+        return result;
+    }
+
+    @Override
+    public ItemStack removeItemNoUpdate(int p_18951_) {
+        return ContainerHelper.takeItem(getItems(), p_18951_);
+    }
+
+    @Override
+    public void setItem(int slot, ItemStack stack) {
+        getItems().set(slot, stack);
+        if (stack.getCount() > getMaxStackSize()) {
+            stack.setCount(getMaxStackSize());
+        }
+    }
+
+    @Override
+    public void setChanged() {
+        super.setChanged();
+        if (!(level instanceof ServerLevel serverWorld)) return;
+        serverWorld.getChunkSource().blockChanged(worldPosition);
+    }
+
+    @Override
+    public void clearContent() {
+        getItems().clear();
     }
 }

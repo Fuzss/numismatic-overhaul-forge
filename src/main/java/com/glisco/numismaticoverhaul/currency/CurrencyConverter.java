@@ -1,7 +1,7 @@
 package com.glisco.numismaticoverhaul.currency;
 
 import com.glisco.numismaticoverhaul.item.NumismaticOverhaulItems;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,9 +17,9 @@ public class CurrencyConverter {
 
         long[] values = CurrencyResolver.splitValues(value);
 
-        output[2] = new ItemStack(NumismaticOverhaulItems.GOLD_COIN, asInt(values[2]));
-        output[1] = new ItemStack(NumismaticOverhaulItems.SILVER_COIN, asInt(values[1]));
-        output[0] = new ItemStack(NumismaticOverhaulItems.BRONZE_COIN, asInt(values[0]));
+        output[2] = new ItemStack(NumismaticOverhaulItems.GOLD_COIN.get(), asInt(values[2]));
+        output[1] = new ItemStack(NumismaticOverhaulItems.SILVER_COIN.get(), asInt(values[1]));
+        output[0] = new ItemStack(NumismaticOverhaulItems.BRONZE_COIN.get(), asInt(values[0]));
 
         return output;
     }
@@ -72,17 +72,17 @@ public class CurrencyConverter {
         List<ItemStack> output = new ArrayList<>();
 
         for (ItemStack stack : input) {
-            if (stack.getCount() <= stack.getMaxCount()) {
+            if (stack.getCount() <= stack.getMaxStackSize()) {
                 output.add(stack);
             } else {
-                for (int i = 0; i < stack.getCount() / stack.getMaxCount(); i++) {
+                for (int i = 0; i < stack.getCount() / stack.getMaxStackSize(); i++) {
                     ItemStack copy = stack.copy();
-                    copy.setCount(stack.getMaxCount());
+                    copy.setCount(stack.getMaxStackSize());
                     output.add(copy);
                 }
 
                 ItemStack copy = stack.copy();
-                copy.setCount(stack.getCount() % stack.getMaxCount());
+                copy.setCount(stack.getCount() % stack.getMaxStackSize());
                 output.add(copy);
             }
         }

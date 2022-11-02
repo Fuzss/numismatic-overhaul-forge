@@ -7,38 +7,38 @@ import com.glisco.numismaticoverhaul.currency.CurrencyConverter;
 import com.glisco.numismaticoverhaul.currency.CurrencyResolver;
 import com.glisco.numismaticoverhaul.network.RequestPurseActionC2SPacket;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.Drawable;
-import net.minecraft.client.gui.DrawableHelper;
-import net.minecraft.client.gui.Element;
-import net.minecraft.client.gui.Selectable;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiComponent;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Widget;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.narration.NarratableEntry;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import org.apache.commons.lang3.mutable.MutableInt;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class PurseWidget extends DrawableHelper implements Drawable, Element, Selectable {
+public class PurseWidget extends GuiComponent implements Widget, GuiEventListener, NarratableEntry {
 
-    public static final Identifier TEXTURE = NumismaticOverhaul.id("textures/gui/purse_widget.png");
-    private final MinecraftClient client;
+    public static final ResourceLocation TEXTURE = NumismaticOverhaul.id("textures/gui/purse_widget.png");
+    private final Minecraft client;
     private final int x;
     private final int y;
 
     private boolean active = false;
-    private final List<ButtonWidget> buttons = new ArrayList<>();
+    private final List<Button> buttons = new ArrayList<>();
 
     private final MutableInt goldAmount = new MutableInt(0);
     private final MutableInt silverAmount = new MutableInt(0);
     private final MutableInt bronzeAmount = new MutableInt(0);
     private final CurrencyComponent currencyStorage;
 
-    public PurseWidget(int x, int y, MinecraftClient client, CurrencyComponent currencyStorage) {
+    public PurseWidget(int x, int y, Minecraft client, CurrencyComponent currencyStorage) {
         this.client = client;
         this.x = x;
         this.y = y;
@@ -54,9 +54,9 @@ public class PurseWidget extends DrawableHelper implements Drawable, Element, Se
 
         buttons.add(new AlwaysOnTopTexturedButtonWidget(x + 3, y + 46, 24, 8, 37, 0, 16, TEXTURE, button -> {
             if (Screen.hasShiftDown() && Screen.hasControlDown()) {
-                NumismaticOverhaul.CHANNEL.clientHandle().send(RequestPurseActionC2SPacket.extractAll());
+                NumismaticOverhaul.CHANNEL.sendToServer(RequestPurseActionC2SPacket.extractAll());
             } else if (selectedValue() > 0) {
-                NumismaticOverhaul.CHANNEL.clientHandle().send(RequestPurseActionC2SPacket.extract(selectedValue()));
+                NumismaticOverhaul.CHANNEL.sendToServer(RequestPurseActionC2SPacket.extract(selectedValue()));
                 resetSelectedValue();
             }
         }));
@@ -65,28 +65,28 @@ public class PurseWidget extends DrawableHelper implements Drawable, Element, Se
     }
 
     @Override
-    public void render(MatrixStack matrices, int mouseX, int mouseY, float delta) {
+    public void render(PoseStack matrices, int mouseX, int mouseY, float delta) {
         if (!active) return;
 
         //Draw over items in the crafting interface
         RenderSystem.disableDepthTest();
         RenderSystem.setShaderTexture(0, TEXTURE);
-        drawTexture(matrices, x, y, 0, 0, 37, 60);
+        blit(matrices, x, y, 0, 0, 37, 60);
 
-        for (ButtonWidget button : buttons) {
+        for (Button button : buttons) {
             button.render(matrices, mouseX, mouseY, delta);
         }
 
-        client.textRenderer.draw(matrices, Text.literal("" + goldAmount), x + 5, y + 12, 16777215);
-        client.textRenderer.draw(matrices, Text.literal("" + silverAmount), x + 5, y + 24, 16777215);
-        client.textRenderer.draw(matrices, Text.literal("" + bronzeAmount), x + 5, y + 36, 16777215);
+        client.font.draw(matrices, Component.literal("" + goldAmount), x + 5, y + 12, 16777215);
+        client.font.draw(matrices, Component.literal("" + silverAmount), x + 5, y + 24, 16777215);
+        client.font.draw(matrices, Component.literal("" + bronzeAmount), x + 5, y + 36, 16777215);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (!this.active || client.player.isSpectator()) return false;
 
-        for (ButtonWidget buttonWidget : buttons) {
+        for (Button buttonWidget : buttons) {
             if (buttonWidget.mouseClicked(mouseX, mouseY, button)) return true;
         }
 
@@ -173,12 +173,12 @@ public class PurseWidget extends DrawableHelper implements Drawable, Element, Se
     }
 
     @Override
-    public SelectionType getType() {
-        return SelectionType.FOCUSED;
+    public NarrationPriority narrationPriority() {
+        return NarrationPriority.FOCUSED;
     }
 
     @Override
-    public void appendNarrations(NarrationMessageBuilder builder) {
+    public void updateNarration(NarrationElementOutput builder) {
 
     }
 
@@ -186,7 +186,7 @@ public class PurseWidget extends DrawableHelper implements Drawable, Element, Se
      * Convenience class so I don't have init 6 buttons with the same config
      */
     public static class SmallPurseAdjustButton extends AlwaysOnTopTexturedButtonWidget {
-        public SmallPurseAdjustButton(int x, int y, PressAction pressAction, boolean add) {
+        public SmallPurseAdjustButton(int x, int y, OnPress pressAction, boolean add) {
             super(x, y, 9, 5, add ? 37 : 46, 24, 10, PurseWidget.TEXTURE, pressAction);
         }
     }

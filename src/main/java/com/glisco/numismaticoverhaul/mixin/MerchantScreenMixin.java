@@ -1,11 +1,12 @@
 package com.glisco.numismaticoverhaul.mixin;
 
 import com.glisco.numismaticoverhaul.item.CurrencyItem;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.ingame.MerchantScreen;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.item.ItemStack;
-import net.minecraft.text.Text;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.MerchantScreen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -15,20 +16,20 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(MerchantScreen.class)
 public abstract class MerchantScreenMixin extends Screen {
 
-    private MerchantScreenMixin(Text title) {
+    private MerchantScreenMixin(Component title) {
         super(title);
     }
 
     private ItemStack numismatic$adjustedFirstBuyItem;
     private ItemStack numismatic$originalFirstBuyItem;
 
-    @Inject(method = "renderFirstBuyItem", at = @At("HEAD"))
-    private void captureFirstBuyItem(MatrixStack matrices, ItemStack adjustedFirstBuyItem, ItemStack originalFirstBuyItem, int x, int y, CallbackInfo ci) {
+    @Inject(method = "renderAndDecorateCostA", at = @At("HEAD"))
+    private void captureFirstBuyItem(PoseStack matrices, ItemStack adjustedFirstBuyItem, ItemStack originalFirstBuyItem, int x, int y, CallbackInfo ci) {
         this.numismatic$originalFirstBuyItem = originalFirstBuyItem;
         this.numismatic$adjustedFirstBuyItem = adjustedFirstBuyItem;
     }
 
-    @ModifyVariable(method = "renderFirstBuyItem", at = @At("HEAD"), argsOnly = true, ordinal = 1)
+    @ModifyVariable(method = "renderAndDecorateCostA", at = @At("HEAD"), argsOnly = true, ordinal = 1)
     private ItemStack dontShowBagDiscount(ItemStack original) {
         var adjustedItem = numismatic$adjustedFirstBuyItem.getItem();
 

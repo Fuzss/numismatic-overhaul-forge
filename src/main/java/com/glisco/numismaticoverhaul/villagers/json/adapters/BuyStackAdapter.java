@@ -4,18 +4,18 @@ import com.glisco.numismaticoverhaul.currency.CurrencyHelper;
 import com.glisco.numismaticoverhaul.villagers.json.TradeJsonAdapter;
 import com.glisco.numismaticoverhaul.villagers.json.VillagerJsonHelper;
 import com.google.gson.JsonObject;
-import net.minecraft.entity.Entity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.random.Random;
-import net.minecraft.village.TradeOffer;
-import net.minecraft.village.TradeOffers;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.npc.VillagerTrades;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.trading.MerchantOffer;
 import org.jetbrains.annotations.NotNull;
 
 public class BuyStackAdapter extends TradeJsonAdapter {
 
     @Override
     @NotNull
-    public TradeOffers.Factory deserialize(JsonObject json) {
+    public VillagerTrades.ItemListing deserialize(JsonObject json) {
 
         loadDefaultStats(json, true);
 
@@ -27,7 +27,7 @@ public class BuyStackAdapter extends TradeJsonAdapter {
         return new Factory(buy, price, max_uses, villager_experience, price_multiplier);
     }
 
-    private static class Factory implements TradeOffers.Factory {
+    private static class Factory implements VillagerTrades.ItemListing {
         private final ItemStack buy;
         private final int price;
         private final int maxUses;
@@ -42,8 +42,8 @@ public class BuyStackAdapter extends TradeJsonAdapter {
             this.multiplier = multiplier;
         }
 
-        public TradeOffer create(Entity entity, Random random) {
-            return new TradeOffer(buy, CurrencyHelper.getClosest(price), this.maxUses, this.experience, this.multiplier);
+        public MerchantOffer getOffer(Entity entity, RandomSource random) {
+            return new MerchantOffer(buy, CurrencyHelper.getClosest(price), this.maxUses, this.experience, this.multiplier);
         }
     }
 }

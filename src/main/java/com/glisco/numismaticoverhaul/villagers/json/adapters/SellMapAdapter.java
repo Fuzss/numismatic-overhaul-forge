@@ -5,51 +5,54 @@ import com.glisco.numismaticoverhaul.currency.CurrencyHelper;
 import com.glisco.numismaticoverhaul.villagers.json.TradeJsonAdapter;
 import com.glisco.numismaticoverhaul.villagers.json.VillagerJsonHelper;
 import com.google.gson.JsonObject;
-import io.wispforest.owo.util.RegistryAccess;
-import net.minecraft.entity.Entity;
-import net.minecraft.item.FilledMapItem;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.item.map.MapIcon;
-import net.minecraft.item.map.MapState;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.JsonHelper;
-import net.minecraft.util.math.random.Random;
-import net.minecraft.util.registry.Registry;
-import net.minecraft.util.registry.RegistryEntryList;
-import net.minecraft.village.TradeOffer;
-import net.minecraft.village.TradeOffers;
-import net.minecraft.world.gen.structure.StructureKeys;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.Registry;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.GsonHelper;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.npc.VillagerTrades;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.MapItem;
+import net.minecraft.world.item.trading.MerchantOffer;
+import net.minecraft.world.level.levelgen.structure.BuiltinStructures;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.saveddata.maps.MapDecoration;
+import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Locale;
+import java.util.Optional;
 
 public class SellMapAdapter extends TradeJsonAdapter {
 
     @Override
     @NotNull
-    public TradeOffers.Factory deserialize(JsonObject json) {
+    public VillagerTrades.ItemListing deserialize(JsonObject json) {
 
         loadDefaultStats(json, true);
 
         VillagerJsonHelper.assertString(json, "structure");
         int price = json.get("price").getAsInt();
 
-        final var structure = new Identifier(JsonHelper.getString(json, "structure"));
+        final var structure = new ResourceLocation(GsonHelper.getAsString(json, "structure"));
         return new Factory(price, structure, max_uses, villager_experience, price_multiplier);
     }
 
-    private static class Factory implements TradeOffers.Factory {
+    private static class Factory implements VillagerTrades.ItemListing {
         private final int price;
-        private final Identifier structureId;
+        private final ResourceLocation structureId;
         private final int maxUses;
         private final int experience;
         private final float multiplier;
 
-        public Factory(int price, Identifier feature, int maxUses, int experience, float multiplier) {
+        public Factory(int price, ResourceLocation feature, int maxUses, int experience, float multiplier) {
             this.price = price;
             this.structureId = feature;
             this.maxUses = maxUses;
@@ -58,36 +61,36 @@ public class SellMapAdapter extends TradeJsonAdapter {
         }
 
         @Nullable
-        public TradeOffer create(Entity entity, Random random) {
-            if (!(entity.world instanceof ServerWorld serverWorld)) return null;
+        public MerchantOffer getOffer(Entity entity, RandomSource random) {
+            if (!(entity.level instanceof ServerLevel serverWorld)) return null;
 
-            final var registry = serverWorld.getRegistryManager().get(Registry.STRUCTURE_KEY);
-            final var feature = RegistryAccess.getEntry(registry, this.structureId);
+            final Registry<Structure> registry = serverWorld.registryAccess().registryOrThrow(Registry.STRUCTURE_REGISTRY);
+            final Optional<Holder<Structure>> feature = registry.getHolder(ResourceKey.create(Registry.STRUCTURE_REGISTRY, this.structureId));
 
-            if (feature == null || feature.getKey().isEmpty()) {
+            if (feature.isEmpty() || !registry.containsKey(this.structureId)) {
                 NumismaticOverhaul.LOGGER.error("Tried to create map to invalid structure " + this.structureId);
                 return null;
             }
 
-            final var result = serverWorld.getChunkManager().getChunkGenerator().locateStructure(serverWorld, RegistryEntryList.of(feature),
-                    entity.getBlockPos(), 1500, true);
+            final var result = serverWorld.getChunkSource().getGenerator().findNearestMapStructure(serverWorld, HolderSet.direct(feature.get()),
+                    entity.blockPosition(), 1500, true);
 
             if (result == null) return null;
             final var blockPos = result.getFirst();
 
-            var iconType = MapIcon.Type.TARGET_X;
-            if (feature.matchesId(StructureKeys.MONUMENT.getValue()))
-                iconType = MapIcon.Type.MONUMENT;
-            if (feature.matchesId(StructureKeys.MANSION.getValue()))
-                iconType = MapIcon.Type.MANSION;
-            if (feature.matchesId(StructureKeys.PILLAGER_OUTPOST.getValue()))
-                iconType = MapIcon.Type.TARGET_POINT;
+            var iconType = MapDecoration.Type.TARGET_X;
+            if (feature.get().is(BuiltinStructures.OCEAN_MONUMENT.location()))
+                iconType = MapDecoration.Type.MONUMENT;
+            if (feature.get().is(BuiltinStructures.WOODLAND_MANSION.location()))
+                iconType = MapDecoration.Type.MANSION;
+            if (feature.get().is(BuiltinStructures.PILLAGER_OUTPOST.location()))
+                iconType = MapDecoration.Type.TARGET_POINT;
 
-            ItemStack itemStack = FilledMapItem.createMap(serverWorld, blockPos.getX(), blockPos.getZ(), (byte) 2, true, true);
-            FilledMapItem.fillExplorationMap(serverWorld, itemStack);
-            MapState.addDecorationsNbt(itemStack, blockPos, "+", iconType);
-            itemStack.setCustomName(Text.translatable("filled_map." + feature.getKey().get().getValue().getPath().toLowerCase(Locale.ROOT)));
-            return new TradeOffer(CurrencyHelper.getClosest(price), new ItemStack(Items.MAP), itemStack, this.maxUses, this.experience, multiplier);
+            ItemStack itemStack = MapItem.create(serverWorld, blockPos.getX(), blockPos.getZ(), (byte) 2, true, true);
+            MapItem.renderBiomePreviewMap(serverWorld, itemStack);
+            MapItemSavedData.addTargetDecoration(itemStack, blockPos, "+", iconType);
+            itemStack.setHoverName(Component.translatable("filled_map." + feature.get().unwrapKey().get().location().getPath().toLowerCase(Locale.ROOT)));
+            return new MerchantOffer(CurrencyHelper.getClosest(price), new ItemStack(Items.MAP), itemStack, this.maxUses, this.experience, multiplier);
         }
     }
 }

@@ -1,7 +1,7 @@
 {
   "replace": false,
   "values": [
-    "numismatic-overhaul:shop",
-    "numismatic-overhaul:piggy_bank"
+    "numismaticoverhaul:shop",
+    "numismaticoverhaul:piggy_bank"
   ]
 }
